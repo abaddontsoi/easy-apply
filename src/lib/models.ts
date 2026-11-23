@@ -50,8 +50,8 @@ export function fallbackNotice(provider: Provider, code: ModelError["code"] | "m
   }
   if (code === "unauthorized") {
     return provider === "grok"
-      ? "Grok 沒有接受這把金鑰，所以改用結構草稿。請在 Railway 檢查 XAI_API_KEY。"
-      : "Gemini 沒有接受這把金鑰，所以改用結構草稿。請在 Railway 檢查 GEMINI_API_KEY。";
+      ? "Grok 沒有接受這把金鑰，所以改用結構草稿。請在 Infisical 檢查 XAI_API_KEY，並確認已同步到 Railway。"
+      : "Gemini 沒有接受這把金鑰，所以改用結構草稿。請在 Infisical 檢查 GEMINI_API_KEY，並確認已同步到 Railway。";
   }
   const name = provider === "grok" ? "Grok" : "Gemini";
   return `${name} 這次沒有完成，所以改用結構草稿。句子仍來自履歷原文。`;
