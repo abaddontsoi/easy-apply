@@ -361,22 +361,22 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[14rem_minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
-        <aside className="grid gap-2">
-          <Button type="button" variant="outline" onClick={startNew}>
+      <main className="mx-auto grid w-full min-w-0 max-w-6xl items-start gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_minmax(0,1fr)]">
+        <aside className="grid min-w-0 gap-2 overflow-hidden">
+          <Button type="button" variant="outline" className="w-full min-w-0 max-w-full" onClick={startNew}>
             新的一封
           </Button>
           {listError ? <p className="text-xs text-destructive">{listError}</p> : null}
-          <ul className="grid gap-1">
+          <ul className="grid min-w-0 gap-1">
             {letters.length === 0 ? (
               <li className="px-1 text-sm text-muted-foreground">存進 Supabase 的信會列在這裡。</li>
             ) : null}
             {letters.map((item) => (
-              <li key={item.id} className="flex items-start gap-1">
+              <li key={item.id} className="flex min-w-0 items-start gap-1">
                 <button
                   type="button"
                   className={cn(
-                    "min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted",
+                    "min-w-0 flex-1 overflow-hidden rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted",
                     item.id === letterId && "bg-muted",
                   )}
                   onClick={() => void openLetter(item.id)}
@@ -395,12 +395,12 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
           </ul>
         </aside>
 
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="font-serif text-xl">材料</CardTitle>
           </CardHeader>
           <CardContent>
-            <form className="grid gap-4" onSubmit={onSubmit}>
+            <form className="grid min-w-0 gap-4" onSubmit={onSubmit}>
               <div className="grid gap-1.5">
                 <div className="flex items-center justify-between gap-3">
                   <Label htmlFor="resume">履歷</Label>
@@ -412,7 +412,7 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
                   maxLength={20000}
                   onChange={(event) => setResume(event.target.value)}
                   placeholder="貼上履歷，或上傳 PDF、Word、純文字。"
-                  className="min-h-52 resize-y"
+                  className="field-sizing-fixed min-h-52 w-full max-w-full resize-y"
                 />
                 <div className="flex flex-wrap gap-2">
                   <input
@@ -449,16 +449,16 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
                   maxLength={20000}
                   onChange={(event) => setJobDescription(event.target.value)}
                   placeholder="貼上招聘頁或職缺描述。"
-                  className="min-h-40 resize-y"
+                  className="field-sizing-fixed min-h-40 w-full max-w-full resize-y"
                 />
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="grid gap-1.5">
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                <div className="grid min-w-0 gap-1.5">
                   <Label htmlFor="company">公司</Label>
                   <Input id="company" value={company} maxLength={120} onChange={(event) => setCompany(event.target.value)} placeholder="可不填" />
                 </div>
-                <div className="grid gap-1.5">
+                <div className="grid min-w-0 gap-1.5">
                   <Label htmlFor="role">職位</Label>
                   <Input id="role" value={role} maxLength={120} onChange={(event) => setRole(event.target.value)} placeholder="可不填" />
                 </div>
@@ -473,7 +473,7 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
                   placeholder="知道姓名再填，否則用敬啟者"
                 />
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
                 <Choice label="模型" value={provider} items={providerItems} onChange={setProvider} />
                 <Choice label="語氣" value={tone} items={TONE_ITEMS} onChange={setTone} />
                 <Choice label="篇幅" value={length} items={LENGTH_ITEMS} onChange={setLength} />
@@ -503,8 +503,8 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
           </CardContent>
         </Card>
 
-        <section ref={resultRef} aria-live="polite">
-          <Card className="lg:sticky lg:top-4">
+        <section ref={resultRef} aria-live="polite" className="min-w-0">
+          <Card className="min-w-0 lg:sticky lg:top-4">
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
                 <CardTitle className="font-serif text-xl">文稿</CardTitle>
@@ -638,7 +638,7 @@ function LetterField({
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="letter-sheet min-h-[28rem] resize-y px-4 py-4 font-serif text-base leading-7 md:text-base"
+        className="letter-sheet field-sizing-fixed min-h-[28rem] w-full max-w-full resize-y px-4 py-4 font-serif text-base leading-7 md:text-base"
       />
       <p className="text-xs text-muted-foreground">{measure(value, language)}</p>
     </div>
@@ -657,7 +657,7 @@ function Choice<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="grid gap-1.5">
+    <div className="grid min-w-0 gap-1.5">
       <Label>{label}</Label>
       <Select
         value={value}
@@ -666,7 +666,7 @@ function Choice<T extends string>({
           if (typeof next === "string" && next in items) onChange(next as T);
         }}
       >
-        <SelectTrigger className="w-full">
+        <SelectTrigger className="w-full min-w-0 max-w-full">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
