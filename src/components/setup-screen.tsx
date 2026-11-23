@@ -1,6 +1,13 @@
 import type { ProviderStatus } from "@/lib/models";
+import type { SetupIssue } from "@/lib/supabase-env";
 
-export function SetupScreen({ providers }: { providers: ProviderStatus }) {
+export function SetupScreen({
+  providers,
+  issues,
+}: {
+  providers: ProviderStatus;
+  issues: SetupIssue[];
+}) {
   return (
     <main className="mx-auto grid min-h-screen max-w-2xl content-center gap-6 px-4 py-10">
       <header className="flex items-start gap-3">
@@ -26,12 +33,30 @@ export function SetupScreen({ providers }: { providers: ProviderStatus }) {
           <li>在 Infisical 建立 SUPABASE_URL、SUPABASE_PUBLISHABLE_KEY、SUPABASE_SECRET_KEY。XAI_API_KEY 與 GEMINI_API_KEY 可以不設。名稱不要加前綴，也不要加 NEXT_PUBLIC_，再同步到 Railway。PORT 由 Railway 注入，不要放進 Infisical。</li>
           <li>用這個專案的 railway.toml 部署。服務會聽 PORT，並綁在 0.0.0.0。</li>
         </ol>
+        <ul className="grid gap-1 text-sm leading-6">
+          {issues.map((issue) => (
+            <li key={issue.name}>{setupIssueText(issue)}</li>
+          ))}
+        </ul>
         <p className="text-sm text-muted-foreground">
-          這三個 Supabase 變數都到齊之前，無法登入。
+          上面列出的項目沒通過之前，無法登入。網址也接受 NEXT_PUBLIC_SUPABASE_URL，publishable key 也接受 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY。
           Grok {providers.grok ? "已連接" : "尚未連接"}。Gemini {providers.gemini ? "已連接" : "尚未連接"}。
           接上 Supabase 之後，沒有模型金鑰仍可登入。文稿會標成結構草稿，並寫進 Supabase。
         </p>
       </section>
     </main>
   );
+}
+
+function setupIssueText(issue: SetupIssue): string {
+  if (issue.name === "SUPABASE_URL" && issue.reason === "missing") return "SUPABASE_URL 沒有讀到。";
+  if (issue.name === "SUPABASE_URL") return "SUPABASE_URL 不是 https 的專案網址。";
+  if (issue.name === "SUPABASE_PUBLISHABLE_KEY" && issue.reason === "missing") {
+    return "SUPABASE_PUBLISHABLE_KEY 沒有讀到。";
+  }
+  if (issue.name === "SUPABASE_PUBLISHABLE_KEY") {
+    return "SUPABASE_PUBLISHABLE_KEY 不是 sb_publishable_ 開頭。eyJ 開頭的舊金鑰不會被接受。";
+  }
+  if (issue.reason === "missing") return "SUPABASE_SECRET_KEY 沒有讀到。";
+  return "SUPABASE_SECRET_KEY 不是 sb_secret_ 開頭。eyJ 開頭的舊金鑰不會被接受。";
 }

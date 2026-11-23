@@ -6,7 +6,9 @@ import { createAuthClient, createDataClient, setSupabaseTestDoubles, supabaseCon
 
 const KEYS = [
   "SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_URL",
   "SUPABASE_PUBLISHABLE_KEY",
+  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
   "SUPABASE_SECRET_KEY",
   "COVER_DESK_E2E",
   "NODE_ENV",
@@ -23,6 +25,8 @@ describe("supabase clients", { concurrency: 1 }, () => {
 
   it("stays unconfigured for legacy keys and for a publishable key alone", () => {
     rememberEnv();
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiJ9.legacy.sig";
     process.env.SUPABASE_SECRET_KEY = "eyJhbGciOiJIUzI1NiJ9.legacy.sig";
@@ -37,7 +41,9 @@ describe("supabase clients", { concurrency: 1 }, () => {
   it("ignores the e2e desk flag and test doubles when NODE_ENV is production", async () => {
     rememberEnv();
     delete process.env.SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     delete process.env.SUPABASE_PUBLISHABLE_KEY;
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
     delete process.env.SUPABASE_SECRET_KEY;
     process.env.COVER_DESK_E2E = "1";
     setSupabaseTestDoubles({
@@ -69,7 +75,9 @@ describe("supabase clients", { concurrency: 1 }, () => {
   it("uses an in-memory desk when COVER_DESK_E2E is set outside production", async () => {
     rememberEnv();
     delete process.env.SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     delete process.env.SUPABASE_PUBLISHABLE_KEY;
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
     delete process.env.SUPABASE_SECRET_KEY;
     writeEnv("NODE_ENV", "development");
     process.env.COVER_DESK_E2E = "1";
@@ -89,6 +97,17 @@ describe("supabase clients", { concurrency: 1 }, () => {
     assert.equal(inserted.error, null);
     const listed = await data.from("letters").select("role").eq("user_id", "someone-else");
     assert.deepEqual(listed.data, []);
+  });
+
+  it("accepts the Next.js public names for the URL and publishable key", () => {
+    rememberEnv();
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_PUBLISHABLE_KEY;
+    delete process.env.COVER_DESK_E2E;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_test_only";
+    process.env.SUPABASE_SECRET_KEY = "sb_secret_test_only";
+    assert.equal(supabaseConfigured(), true);
   });
 });
 

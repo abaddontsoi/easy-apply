@@ -13,7 +13,9 @@ export const USER_B = { id: "user-b", email: "b@example.com" };
 
 const KEYS = [
   "SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_URL",
   "SUPABASE_PUBLISHABLE_KEY",
+  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
   "SUPABASE_SECRET_KEY",
   "XAI_API_KEY",
   "GEMINI_API_KEY",
@@ -49,7 +51,9 @@ export function installTestEnv(): void {
 
 export function clearSecrets(): void {
   delete process.env.SUPABASE_URL;
+  delete process.env.NEXT_PUBLIC_SUPABASE_URL;
   delete process.env.SUPABASE_PUBLISHABLE_KEY;
+  delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   delete process.env.SUPABASE_SECRET_KEY;
   delete process.env.XAI_API_KEY;
   delete process.env.GEMINI_API_KEY;
