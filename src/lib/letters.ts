@@ -39,9 +39,10 @@ type Row = {
 };
 
 export async function listLetters(session: Session): Promise<LetterSummary[] | Response> {
-  const { data, error } = await session.supabase
+  const { data, error } = await session.data
     .from("letters")
     .select("id, role, company, subject, provider, mode, updated_at")
+    .eq("user_id", session.userId)
     .order("updated_at", { ascending: false })
     .limit(MAX_LETTERS);
   if (error) return storeFailure(error);
@@ -52,12 +53,13 @@ export async function listLetters(session: Session): Promise<LetterSummary[] | R
 }
 
 export async function readLetter(session: Session, id: string): Promise<StoredLetter | Response> {
-  const { data, error } = await session.supabase
+  const { data, error } = await session.data
     .from("letters")
     .select(
       "id, resume, job_description, company, role, hiring_manager, tone, length, language, format, provider, subject, letter, email, used_facts, omissions, mode, notice, updated_at",
     )
     .eq("id", id)
+    .eq("user_id", session.userId)
     .maybeSingle();
   if (error) return storeFailure(error);
   if (!data) return privateJson({ error: "找不到這封信。" }, 404);
@@ -95,19 +97,20 @@ export async function saveLetter(
   };
 
   if (!id) {
-    const { count, error: countError } = await session.supabase
+    const { count, error: countError } = await session.data
       .from("letters")
-      .select("id", { count: "exact", head: true });
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", session.userId);
     if (countError) return storeFailure(countError);
     if ((count ?? 0) >= MAX_LETTERS) {
       return privateJson({ error: "已有 100 封信。刪掉舊的，才能再存。" }, 409);
     }
-    const { data, error } = await session.supabase.from("letters").insert(record).select("id").single();
+    const { data, error } = await session.data.from("letters").insert(record).select("id").single();
     if (error) return storeFailure(error);
     return { id: String((data as { id: string }).id) };
   }
 
-  const { data, error } = await session.supabase
+  const { data, error } = await session.data
     .from("letters")
     .update({
       resume: record.resume,
@@ -130,6 +133,7 @@ export async function saveLetter(
       updated_at: record.updated_at,
     })
     .eq("id", id)
+    .eq("user_id", session.userId)
     .select("id")
     .maybeSingle();
   if (error) return storeFailure(error);
@@ -138,10 +142,11 @@ export async function saveLetter(
 }
 
 export async function removeLetter(session: Session, id: string): Promise<Response | null> {
-  const { error, count } = await session.supabase
+  const { error, count } = await session.data
     .from("letters")
     .delete({ count: "exact" })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", session.userId);
   if (error) return storeFailure(error);
   if (!count) return privateJson({ error: "找不到這封信。" }, 404);
   return null;
@@ -150,7 +155,7 @@ export async function removeLetter(session: Session, id: string): Promise<Respon
 function storeFailure(error: { code?: string }): Response {
   if (error.code === "PGRST205" || error.code === "42P01") {
     return privateJson(
-      { error: "Supabase 還沒有 letters 資料表。請執行 supabase/migrations/0001_letters.sql。" },
+      { error: "Supabase 還沒有 letters 資料表。請依序執行 supabase/migrations 裡的 SQL。" },
       500,
     );
   }

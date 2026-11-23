@@ -31,26 +31,15 @@ create table if not exists public.letters (
 create index if not exists letters_user_updated_idx
   on public.letters (user_id, updated_at desc);
 
+-- The Data API roles cannot read or write this table. The web app uses a secret key
+-- (service_role, which bypasses row level security) and checks the signed-in user first.
 alter table public.letters enable row level security;
+alter table public.letters force row level security;
 
 drop policy if exists letters_select on public.letters;
 drop policy if exists letters_insert on public.letters;
 drop policy if exists letters_update on public.letters;
 drop policy if exists letters_delete on public.letters;
 
-create policy letters_select on public.letters
-  for select to authenticated
-  using (auth.uid() = user_id);
-
-create policy letters_insert on public.letters
-  for insert to authenticated
-  with check (auth.uid() = user_id);
-
-create policy letters_update on public.letters
-  for update to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
-create policy letters_delete on public.letters
-  for delete to authenticated
-  using (auth.uid() = user_id);
+revoke all on table public.letters from public, anon, authenticated;
+grant select, insert, update, delete on table public.letters to service_role;

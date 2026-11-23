@@ -1,5 +1,5 @@
 import { privateJson, readJson } from "@/lib/http";
-import { createClient, supabaseConfigured } from "@/lib/supabase";
+import { createAuthClient, supabaseConfigured } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const credentials = readCredentials(body.value);
   if (!credentials) return privateJson({ error: "請輸入電郵和至少 8 個字元的密碼。" }, 400);
 
-  const supabase = await createClient();
+  const supabase = await createAuthClient();
   if (!supabase) return privateJson({ error: "Supabase 尚未設定。" }, 503);
   const { data, error } = await supabase.auth.signUp(credentials);
   if (error) return privateJson({ error: "這個電郵沒有完成註冊。請換一個，或直接登入。" }, 400);
