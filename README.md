@@ -25,7 +25,9 @@ Infisical is the only place these values are stored. The app still reads `proces
 - `XAI_API_KEY` for Grok
 - `GEMINI_API_KEY` for Gemini
 
-Either model key can be omitted. The missing model falls back to a labeled structured draft, which is still stored in Supabase. Keep both Supabase keys server-side. Do not prefix them with `NEXT_PUBLIC_`, and do not store a legacy `anon` or `service_role` key.
+Either model key can be omitted. The missing model falls back to a labeled structured draft, which is still stored in Supabase. Keep both Supabase keys server-side. Do not prefix the secret key with `NEXT_PUBLIC_`, and do not store a legacy `anon` or `service_role` key.
+
+If `SUPABASE_URL` or `SUPABASE_PUBLISHABLE_KEY` is empty, the server also reads `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. A value wrapped in one pair of quotes is accepted. The setup screen names the variable that is missing or rejected, and it never prints the value. A publishable key must start with `sb_publishable_`. A secret key must start with `sb_secret_`. The URL must be `https`, except `http://localhost` and `http://127.0.0.1`.
 
 Use a `dev` environment for local work and a `prod` environment for Railway. Keep the key schema as `{{secretKey}}` so the names are not prefixed.
 

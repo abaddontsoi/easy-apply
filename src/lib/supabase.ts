@@ -2,7 +2,13 @@ import { createClient as createSupabaseClient, type SupabaseClient } from "@supa
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { createMemoryDataClient, type MemoryLetter } from "@/lib/memory-letters";
-import { readPublishableKey, readSecretKey, readSupabaseUrl } from "@/lib/supabase-env";
+import {
+  readPublishableKey,
+  readSecretKey,
+  readSupabaseUrl,
+  supabaseSetupIssues,
+  type SetupIssue,
+} from "@/lib/supabase-env";
 
 const E2E_USER = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -35,7 +41,12 @@ let e2eLetters: MemoryLetter[] | null = null;
 
 export function supabaseConfigured(): boolean {
   if (e2eDeskEnabled()) return true;
-  return Boolean(supabaseUrl() && publishableKey() && secretKey());
+  return supabaseSetupIssues(currentSupabaseEnv()).length === 0;
+}
+
+export function supabaseConfigurationIssues(): SetupIssue[] {
+  if (e2eDeskEnabled()) return [];
+  return supabaseSetupIssues(currentSupabaseEnv());
 }
 
 export function setSupabaseTestDoubles(
@@ -99,16 +110,24 @@ export function createDataClient(): SupabaseClient | null {
   });
 }
 
+function currentSupabaseEnv() {
+  return {
+    url: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
+    publishable: process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    secret: process.env.SUPABASE_SECRET_KEY,
+  };
+}
+
 function supabaseUrl(): string | null {
-  return readSupabaseUrl(process.env.SUPABASE_URL);
+  return readSupabaseUrl(currentSupabaseEnv().url);
 }
 
 function publishableKey(): string | null {
-  return readPublishableKey(process.env.SUPABASE_PUBLISHABLE_KEY);
+  return readPublishableKey(currentSupabaseEnv().publishable);
 }
 
 function secretKey(): string | null {
-  return readSecretKey(process.env.SUPABASE_SECRET_KEY);
+  return readSecretKey(currentSupabaseEnv().secret);
 }
 
 function e2eDeskEnabled(): boolean {

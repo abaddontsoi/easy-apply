@@ -10,8 +10,10 @@ type PendingCookie = {
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
-  const url = readSupabaseUrl(process.env.SUPABASE_URL);
-  const key = readPublishableKey(process.env.SUPABASE_PUBLISHABLE_KEY);
+  const url = readSupabaseUrl(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const key = readPublishableKey(
+    process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  );
   if (!url || !key) return response;
 
   const pending: PendingCookie[] = [];
