@@ -8,11 +8,11 @@
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 --port 4747",
     "dev:infisical": "infisical secrets-manager run --env=dev -- npm run dev",
-    "build": "next build",
-    "start": "next start --hostname 0.0.0.0",
+    "build": "node scripts/load-infisical.mjs -- next build",
+    "start": "node scripts/load-infisical.mjs -- next start --hostname 0.0.0.0",
     "lint": "eslint",
     "test": "npm run test:unit && npm run test:integration",
-    "test:unit": "tsx --test src/lib/compose.test.ts src/lib/draft.test.ts src/lib/extract.test.ts src/lib/guard.test.ts src/lib/http.test.ts src/lib/letters.test.ts src/lib/models.test.ts src/lib/supabase-env.test.ts src/lib/supabase.test.ts",
+    "test:unit": "tsx --test src/lib/compose.test.ts src/lib/draft.test.ts src/lib/extract.test.ts src/lib/guard.test.ts src/lib/http.test.ts src/lib/letters.test.ts src/lib/models.test.ts src/lib/supabase-env.test.ts src/lib/supabase.test.ts && node --test scripts/load-infisical.test.mjs",
     "test:integration": "tsx --test tests/integration/auth.test.ts tests/integration/draft.test.ts tests/integration/extract.test.ts tests/integration/letters.test.ts",
     "test:e2e": "node e2e/run.cjs"
   },

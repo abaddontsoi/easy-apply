@@ -33,9 +33,15 @@ Use a `dev` environment for local work and a `prod` environment for Railway. Kee
 
 ## Railway
 
-`railway.toml` builds with Nixpacks (`npm run build`) and starts with `npm run start`. The server listens on `0.0.0.0` and Railway's `PORT`. Railway injects `PORT`; do not store it in Infisical.
+`railway.toml` builds with Nixpacks (`npm run build`) and starts with `npm run start`. Both commands load Infisical before Next starts, then the server listens on `0.0.0.0` and Railway's `PORT`. Railway injects `PORT`; do not store it in Infisical, and a fetched `PORT` is ignored.
 
-Create a Railway connection in Infisical, then a Railway secret sync from the `prod` environment to this service. Turn on auto-sync. The start command does not call the Infisical CLI.
+Set only these three variables on the Railway service. Do not sync the Supabase or model secrets into Railway.
+
+- `INFISICAL_ID`: the Infisical project id
+- `INFISICAL_TOKEN`: a Bearer access token for that project
+- `INFISICAL_ENV`: the environment slug, such as `prod`
+
+`npm run build` and `npm run start` call `https://us.infisical.com/api/v4/secrets` with that token. For the EU cloud or a self-hosted instance, also set `INFISICAL_API_URL` to its origin. The token is not printed. If any of the three values is missing while another is set, the process exits. If none are set, the command runs with the environment it already has, which is how local tests and CI build.
 
 ## Run locally
 

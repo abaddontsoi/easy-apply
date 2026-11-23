@@ -25,6 +25,18 @@ const eslintConfig = [
       "e2e/**/*.cjs",
     ],
   },
+  {
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        AbortSignal: "readonly",
+        URL: "readonly",
+        console: "readonly",
+        fetch: "readonly",
+        process: "readonly",
+      },
+    },
+  },
 ];
 
 export default eslintConfig;
