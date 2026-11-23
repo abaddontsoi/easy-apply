@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { POST as extract } from "../../src/app/api/extract/route";
-import { USER_A, installDesk, useConfiguredEnv, useTestEnv, readPayload } from "./harness";
+import { USER_A, installDesk, configureTestEnv, installTestEnv, readPayload } from "./harness";
 
-useTestEnv();
+installTestEnv();
 
 describe("extract route", { concurrency: 1 }, () => {
   it("rejects an unconfigured project and a signed-out upload", async () => {
     const missing = await extract(fileRequest("resume.txt", "Chloe Chan résumé text that is long enough."));
     assert.equal(missing.status, 503);
 
-    useConfiguredEnv();
+    configureTestEnv();
     const desk = installDesk([USER_A]);
     desk.signInAs(null);
     const signedOut = await extract(fileRequest("resume.txt", "Chloe Chan résumé text that is long enough."));
@@ -18,7 +18,7 @@ describe("extract route", { concurrency: 1 }, () => {
   });
 
   it("reads a text résumé and rejects a request without a file", async () => {
-    useConfiguredEnv();
+    configureTestEnv();
     installDesk([USER_A]);
     const response = await extract(fileRequest("C:\\docs\\resume.txt", "Chloe Chan\nKept the launch calendar for 1,200 teams."));
     assert.equal(response.status, 200);

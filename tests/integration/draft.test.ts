@@ -1,18 +1,18 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { POST as draft } from "../../src/app/api/draft/route";
-import { USER_A, installDesk, jsonRequest, letterBody, readPayload, useConfiguredEnv, useTestEnv } from "./harness";
+import { USER_A, installDesk, jsonRequest, letterBody, readPayload, configureTestEnv, installTestEnv } from "./harness";
 
 const FAKE_KEY = "unit-test-key";
 
-useTestEnv();
+installTestEnv();
 
 describe("draft route", { concurrency: 1 }, () => {
   it("rejects an unconfigured project and a signed-out writer", async () => {
     const missing = await draft(jsonRequest("http://127.0.0.1/api/draft", letterBody()));
     assert.equal(missing.status, 503);
 
-    useConfiguredEnv();
+    configureTestEnv();
     const desk = installDesk([USER_A]);
     desk.signInAs(null);
     const signedOut = await draft(jsonRequest("http://127.0.0.1/api/draft", letterBody()));
@@ -20,7 +20,7 @@ describe("draft route", { concurrency: 1 }, () => {
   });
 
   it("stores a structured draft without calling a model when no key is set", async () => {
-    useConfiguredEnv();
+    configureTestEnv();
     const desk = installDesk([USER_A]);
     let called = false;
     globalThis.fetch = (async () => {
@@ -48,7 +48,7 @@ describe("draft route", { concurrency: 1 }, () => {
   });
 
   it("keeps the structured draft when the model rejects the key", async () => {
-    useConfiguredEnv();
+    configureTestEnv();
     process.env.XAI_API_KEY = FAKE_KEY;
     const desk = installDesk([USER_A]);
     const calls: string[] = [];
@@ -70,7 +70,7 @@ describe("draft route", { concurrency: 1 }, () => {
   });
 
   it("stops the ninth write inside ten minutes", async () => {
-    useConfiguredEnv();
+    configureTestEnv();
     const desk = installDesk([USER_A]);
     for (let count = 0; count < 8; count += 1) {
       const response = await draft(jsonRequest("http://127.0.0.1/api/draft", letterBody({ role: `Role ${count}` })));

@@ -10,11 +10,11 @@ import {
   jsonRequest,
   letterBody,
   readPayload,
-  useConfiguredEnv,
-  useTestEnv,
+  configureTestEnv,
+  installTestEnv,
 } from "./harness";
 
-useTestEnv();
+installTestEnv();
 
 describe("letter routes", { concurrency: 1 }, () => {
   it("rejects an unconfigured project and a legacy JWT key", async () => {
@@ -30,7 +30,7 @@ describe("letter routes", { concurrency: 1 }, () => {
   });
 
   it("rejects a signed-out reader", async () => {
-    useConfiguredEnv();
+    configureTestEnv();
     const desk = installDesk([USER_A, USER_B]);
     desk.signInAs(null);
     const response = await listLetters();
@@ -39,7 +39,7 @@ describe("letter routes", { concurrency: 1 }, () => {
   });
 
   it("keeps list, read, update, and delete inside the signed-in user", async () => {
-    useConfiguredEnv();
+    configureTestEnv();
     const desk = installDesk([USER_A, USER_B]);
     desk.signInAs(USER_A.id);
     const created = await createLetter(jsonRequest("http://127.0.0.1/api/letters", letterBody()));
@@ -90,7 +90,7 @@ describe("letter routes", { concurrency: 1 }, () => {
   });
 
   it("rejects an invalid id and a letter that is too short", async () => {
-    useConfiguredEnv();
+    configureTestEnv();
     installDesk([USER_A]);
     const invalid = await readLetter(requestFor("not-a-uuid"), contextFor("not-a-uuid"));
     assert.equal(invalid.status, 400);
@@ -109,7 +109,7 @@ describe("letter routes", { concurrency: 1 }, () => {
   });
 
   it("counts only the signed-in user's letters toward the 100 letter limit", async () => {
-    useConfiguredEnv();
+    configureTestEnv();
     const desk = installDesk([USER_A, USER_B]);
     for (let index = 0; index < 100; index += 1) {
       desk.rows.push({ id: crypto.randomUUID(), user_id: USER_A.id });

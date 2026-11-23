@@ -66,8 +66,9 @@ class LetterQuery implements PromiseLike<QueryResult> {
     return this;
   }
 
-  delete(_options?: { count?: "exact" }) {
+  delete(options?: { count?: "exact" }) {
     this.action = "delete";
+    void options;
     return this;
   }
 

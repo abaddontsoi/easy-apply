@@ -10,11 +10,11 @@ import {
   installDesk,
   jsonRequest,
   readPayload,
-  useConfiguredEnv,
-  useTestEnv,
+  configureTestEnv,
+  installTestEnv,
 } from "./harness";
 
-useTestEnv();
+installTestEnv();
 
 describe("auth routes", { concurrency: 1 }, () => {
   it("rejects login and signup when Supabase is not configured", async () => {
@@ -27,7 +27,7 @@ describe("auth routes", { concurrency: 1 }, () => {
   });
 
   it("rejects a bad email, a short password, and a body that is not JSON", async () => {
-    useConfiguredEnv();
+    configureTestEnv();
     installDesk([USER_A]);
     const badEmail = await login(
       jsonRequest("http://127.0.0.1/api/auth/login", { email: "not-an-email", password: "password-ok" }),
@@ -50,7 +50,7 @@ describe("auth routes", { concurrency: 1 }, () => {
   });
 
   it("rejects a wrong password and signs in with a normalized email", async () => {
-    useConfiguredEnv();
+    configureTestEnv();
     const desk = installDesk([USER_A]);
     desk.signInAs(null);
     const rejected = await login(
@@ -71,7 +71,7 @@ describe("auth routes", { concurrency: 1 }, () => {
   });
 
   it("creates an account, reports confirmation, and reports a rejected signup", async () => {
-    useConfiguredEnv();
+    configureTestEnv();
     installDesk([USER_A]);
     const created = await signup(
       jsonRequest("http://127.0.0.1/api/auth/signup", { email: "new@example.com", password: "password-ok" }),
@@ -81,7 +81,7 @@ describe("auth routes", { concurrency: 1 }, () => {
     assert.equal(createdBody.email, "new@example.com");
     assert.equal(createdBody.needsConfirmation, false);
 
-    useConfiguredEnv();
+    configureTestEnv();
     installAuth({
       auth: {
         async getUser() {
@@ -131,7 +131,7 @@ describe("auth routes", { concurrency: 1 }, () => {
     assert.equal(open.status, 200);
     assert.deepEqual(await readPayload(open), { ok: true });
 
-    useConfiguredEnv();
+    configureTestEnv();
     installDesk([USER_A]);
     const signedOut = await logout();
     assert.equal(signedOut.status, 200);

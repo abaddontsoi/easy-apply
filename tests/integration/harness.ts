@@ -24,7 +24,7 @@ const KEYS = [
 const saved = new Map<string, string | undefined>();
 const originalFetch = globalThis.fetch;
 
-export function useTestEnv(): void {
+export function installTestEnv(): void {
   beforeEach(() => {
     for (const key of KEYS) saved.set(key, process.env[key]);
     writeEnv("NODE_ENV", "test");
@@ -56,7 +56,7 @@ export function clearSecrets(): void {
   delete process.env.COVER_DESK_E2E;
 }
 
-export function useConfiguredEnv(): void {
+export function configureTestEnv(): void {
   process.env.SUPABASE_URL = TEST_URL;
   process.env.SUPABASE_PUBLISHABLE_KEY = TEST_PUBLISHABLE;
   process.env.SUPABASE_SECRET_KEY = TEST_SECRET;
