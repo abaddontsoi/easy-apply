@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 --port 4747",
+    "dev:infisical": "infisical secrets-manager run --env=dev -- npm run dev",
     "build": "next build",
     "start": "next start --hostname 0.0.0.0",
     "lint": "eslint",

@@ -22,7 +22,7 @@ export function SetupScreen({ providers }: { providers: ProviderStatus }) {
         <ol className="grid list-decimal gap-2 pl-5 text-sm leading-6">
           <li>在 Supabase 建立專案，於 SQL Editor 執行 supabase/migrations/0001_letters.sql。</li>
           <li>在 Authentication 開啟 Email。Site URL 填 Railway 給這個服務的網址。</li>
-          <li>在 Railway 設定 SUPABASE_URL、SUPABASE_ANON_KEY，以及要使用的 XAI_API_KEY、GEMINI_API_KEY。</li>
+          <li>在 Infisical 建立 SUPABASE_URL、SUPABASE_ANON_KEY，以及要使用的 XAI_API_KEY、GEMINI_API_KEY，並同步到這個 Railway 服務。名稱不要加前綴。</li>
           <li>用這個專案的 railway.toml 部署。服務會聽 PORT，並綁在 0.0.0.0。</li>
         </ol>
         <p className="text-sm text-muted-foreground">

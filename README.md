@@ -13,25 +13,34 @@ Accounts, résumés, job descriptions, and letters live in Supabase. Nothing is 
 3. Enable email sign-in. Set the Site URL to the Railway URL.
 4. Copy the project URL and the anon key. The anon key is safe to use with the row-level security policies in that migration. Do not put the service-role key in this app.
 
-## Railway
+## Secrets
 
-`railway.toml` builds with Nixpacks (`npm run build`) and starts with `npm run start`. The server listens on `0.0.0.0` and Railway's `PORT`.
-
-Set these variables on the service:
+Infisical is the only place these values are stored. The app still reads `process.env`, so the secret names stay exactly as listed in `.env.example`:
 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `XAI_API_KEY` for Grok
 - `GEMINI_API_KEY` for Gemini
 
-Either model key can be omitted. The missing model falls back to a labeled structured draft, which is still stored in Supabase.
+Either model key can be omitted. The missing model falls back to a labeled structured draft, which is still stored in Supabase. Do not put the Supabase service-role key in Infisical for this app.
+
+Use a `dev` environment for local work and a `prod` environment for Railway. Keep the key schema as `{{secretKey}}` so the names are not prefixed.
+
+## Railway
+
+`railway.toml` builds with Nixpacks (`npm run build`) and starts with `npm run start`. The server listens on `0.0.0.0` and Railway's `PORT`. Railway injects `PORT`; do not store it in Infisical.
+
+Create a Railway connection in Infisical, then a Railway secret sync from the `prod` environment to this service. Turn on auto-sync. The start command does not call the Infisical CLI.
 
 ## Run locally
 
+Install the [Infisical CLI](https://infisical.com/docs/cli/overview), then from this directory:
+
 ```bash
 npm install
-cp .env.example .env.local
-npm run dev
+infisical login
+infisical init
+npm run dev:infisical
 ```
 
-Fill `.env.local` with the same variables. The dev server listens on port 4747. `npm test` checks the structured drafter. `npm run lint` runs ESLint.
+`infisical init` writes `.infisical.json` with the project id only. Commit that file. `npm run dev:infisical` runs `infisical secrets-manager run --env=dev -- npm run dev` and injects the `dev` secrets. The dev server listens on port 4747. `npm test` checks the structured drafter. `npm run lint` runs ESLint.
