@@ -1,5 +1,6 @@
 [build]
 builder = "NIXPACKS"
+# npm run build loads Infisical when INFISICAL_ID, INFISICAL_TOKEN, and INFISICAL_ENV are set.
 buildCommand = "npm run build"
 
 [deploy]

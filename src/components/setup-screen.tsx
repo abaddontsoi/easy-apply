@@ -30,7 +30,7 @@ export function SetupScreen({
           <li>在 Supabase 建立專案，於 SQL Editor 先執行 supabase/migrations/0001_letters.sql，再執行 supabase/migrations/0002_lock_letters.sql。</li>
           <li>在 Authentication 開啟 Email。Site URL 填 Railway 給這個服務的網址。</li>
           <li>在 API Keys 建立 publishable key 與這個服務專用的 secret key，並停用 legacy anon 與 service_role。不要填 eyJ 開頭的舊金鑰。</li>
-          <li>在 Infisical 建立 SUPABASE_URL、SUPABASE_PUBLISHABLE_KEY、SUPABASE_SECRET_KEY。XAI_API_KEY 與 GEMINI_API_KEY 可以不設。名稱不要加前綴，也不要加 NEXT_PUBLIC_，再同步到 Railway。PORT 由 Railway 注入，不要放進 Infisical。</li>
+          <li>在 Infisical 建立 SUPABASE_URL、SUPABASE_PUBLISHABLE_KEY、SUPABASE_SECRET_KEY。XAI_API_KEY 與 GEMINI_API_KEY 可以不設。名稱不要加前綴，也不要加 NEXT_PUBLIC_。Railway 只設定 INFISICAL_ID、INFISICAL_TOKEN、INFISICAL_ENV。PORT 由 Railway 注入，不要放進 Infisical。</li>
           <li>用這個專案的 railway.toml 部署。服務會聽 PORT，並綁在 0.0.0.0。</li>
         </ol>
         <ul className="grid gap-1 text-sm leading-6">

@@ -21,6 +21,12 @@ const blankSecrets = {
   XAI_API_KEY: "",
   GEMINI_API_KEY: "",
   COVER_DESK_E2E: "",
+  INFISICAL_ID: "",
+  INFISICAL_PROJECT_ID: "",
+  INFISICAL_TOKEN: "",
+  INFISICAL_ENV: "",
+  INFISICAL_ENVIRONMENT: "",
+  INFISICAL_API_URL: "",
 };
 
 export default defineConfig({
