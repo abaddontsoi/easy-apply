@@ -1,46 +1,52 @@
 import { composeStructured } from "@/lib/compose";
-import { parseDraftInput } from "@/lib/draft";
+import { parseDraftInput, parseLetterId } from "@/lib/draft";
 import { allowWrite } from "@/lib/guard";
-import { privateJson } from "@/lib/http";
-import { ModelError, modelConfigured, writeWithModel } from "@/lib/openai";
-import { requireIdentity } from "../../../../cursor/identity";
+import { privateJson, readJson } from "@/lib/http";
+import { saveLetter } from "@/lib/letters";
+import { ModelError, fallbackNotice, providerReady, writeWithModel } from "@/lib/models";
+import { requireUser } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const identity = await requireIdentity(request);
-  if (identity instanceof Response) return identity;
-  if (!allowWrite(identity.sub)) {
+  const session = await requireUser();
+  if (session instanceof Response) return session;
+  if (!allowWrite(session.userId)) {
     return privateJson({ error: "這十分鐘已經寫了八次，請稍後再寫。" }, 429);
   }
 
-  let body: unknown;
-  try {
-    const raw = await request.text();
-    if (raw.length > 80_000) {
-      return privateJson({ error: "內容太長，請剪短履歷或職缺說明。" }, 413);
-    }
-    body = JSON.parse(raw) as unknown;
-  } catch {
-    return privateJson({ error: "請送出履歷和職缺說明。" }, 400);
-  }
-
-  const parsed = parseDraftInput(body);
+  const body = await readJson(request, 80_000);
+  if (!body.ok) return body.response;
+  const parsed = parseDraftInput(body.value);
   if (!parsed.ok) return privateJson({ error: parsed.error }, 400);
+  const letterId = parseLetterId(
+    body.value && typeof body.value === "object" ? (body.value as { letterId?: unknown }).letterId : null,
+  );
+  if (!letterId.ok) return privateJson({ error: letterId.error }, 400);
 
-  if (!modelConfigured()) {
-    return privateJson(composeStructured(parsed.value));
+  let draft = composeStructured(parsed.value);
+  if (!providerReady(parsed.value.provider)) {
+    draft = { ...draft, notice: fallbackNotice(parsed.value.provider, "missing") };
+  } else {
+    try {
+      draft = await writeWithModel(parsed.value);
+    } catch (error) {
+      const code = error instanceof ModelError ? error.code : "unavailable";
+      draft = { ...composeStructured(parsed.value), notice: fallbackNotice(parsed.value.provider, code) };
+    }
   }
 
-  try {
-    return privateJson(await writeWithModel(parsed.value));
-  } catch (error) {
-    const draft = composeStructured(parsed.value);
-    draft.notice =
-      error instanceof ModelError && error.code === "unauthorized"
-        ? "OpenAI 沒有接受這把金鑰，所以改用結構草稿。請在 Cursor Secrets 檢查 OPENAI_API_KEY。"
-        : "模型這次沒有完成，所以改用結構草稿。句子仍來自履歷原文。";
-    return privateJson(draft);
+  const saved = await saveLetter(session, letterId.id, parsed.value, draft);
+  if (saved instanceof Response) {
+    const failure = (await saved.json()) as { error?: string };
+    return privateJson({
+      ...draft,
+      provider: parsed.value.provider,
+      id: letterId.id,
+      stored: false,
+      saveError: failure.error ?? "Supabase 這次沒有存成。",
+    });
   }
+  return privateJson({ ...draft, provider: parsed.value.provider, id: saved.id, stored: true, saveError: "" });
 }

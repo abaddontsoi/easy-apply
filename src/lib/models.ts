@@ -1,8 +1,10 @@
 import { composeStructured } from "@/lib/compose";
-import type { DraftInput, DraftOutput, Length } from "@/lib/draft";
+import type { DraftInput, DraftOutput, Length, Provider } from "@/lib/draft";
 
-const MODEL = "gpt-4o-mini";
-const ENDPOINT = "https://api.openai.com/v1/chat/completions";
+const GROK_MODEL = "grok-4.7";
+const GEMINI_MODEL = "gemini-3.5-flash-lite";
+const GROK_ENDPOINT = "https://api.x.ai/v1/chat/completions";
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const LENGTH_GUIDE: Record<Length, string> = {
   email: "about 120 words, or about 220 Chinese characters",
@@ -10,8 +12,20 @@ const LENGTH_GUIDE: Record<Length, string> = {
   detailed: "about 430 words, or about 750 Chinese characters",
 };
 
-export function modelConfigured(): boolean {
-  return Boolean(process.env.OPENAI_API_KEY?.trim());
+export type ProviderStatus = {
+  grok: boolean;
+  gemini: boolean;
+};
+
+export function providerStatus(): ProviderStatus {
+  return {
+    grok: Boolean(process.env.XAI_API_KEY?.trim()),
+    gemini: Boolean(process.env.GEMINI_API_KEY?.trim()),
+  };
+}
+
+export function providerReady(provider: Provider): boolean {
+  return providerStatus()[provider];
 }
 
 export class ModelError extends Error {
@@ -25,52 +39,87 @@ export class ModelError extends Error {
 }
 
 export async function writeWithModel(input: DraftInput): Promise<DraftOutput> {
-  const key = process.env.OPENAI_API_KEY?.trim();
-  if (!key) throw new ModelError("unauthorized");
+  if (input.provider === "grok") return writeWithGrok(input);
+  return writeWithGemini(input);
+}
 
+export function fallbackNotice(provider: Provider, code: ModelError["code"] | "missing"): string {
+  if (code === "missing") {
+    const name = provider === "grok" ? "Grok" : "Gemini";
+    return `尚未連接 ${name}，所以這是結構草稿。句子來自履歷原文，不會補上沒有的成就。`;
+  }
+  if (code === "unauthorized") {
+    return provider === "grok"
+      ? "Grok 沒有接受這把金鑰，所以改用結構草稿。請在 Railway 檢查 XAI_API_KEY。"
+      : "Gemini 沒有接受這把金鑰，所以改用結構草稿。請在 Railway 檢查 GEMINI_API_KEY。";
+  }
+  const name = provider === "grok" ? "Grok" : "Gemini";
+  return `${name} 這次沒有完成，所以改用結構草稿。句子仍來自履歷原文。`;
+}
+
+async function writeWithGrok(input: DraftInput): Promise<DraftOutput> {
+  const key = process.env.XAI_API_KEY?.trim();
+  if (!key) throw new ModelError("unauthorized");
+  const payload = await postJson(GROK_ENDPOINT, {
+    authorization: `Bearer ${key}`,
+    "content-type": "application/json",
+  }, {
+    model: GROK_MODEL,
+    temperature: 0.4,
+    max_tokens: 4000,
+    messages: [
+      { role: "system", content: SYSTEM },
+      { role: "user", content: userPrompt(input) },
+    ],
+  });
+  const parsed = parseModelJson(readChatContent(payload));
+  if (!parsed) throw new ModelError("bad_response");
+  return normalizeModel(input, parsed);
+}
+
+async function writeWithGemini(input: DraftInput): Promise<DraftOutput> {
+  const key = process.env.GEMINI_API_KEY?.trim();
+  if (!key) throw new ModelError("unauthorized");
+  const payload = await postJson(GEMINI_ENDPOINT, {
+    "content-type": "application/json",
+    "x-goog-api-key": key,
+  }, {
+    systemInstruction: { parts: [{ text: SYSTEM }] },
+    contents: [{ role: "user", parts: [{ text: userPrompt(input) }] }],
+    generationConfig: {
+      temperature: 0.4,
+      maxOutputTokens: 4000,
+      responseMimeType: "application/json",
+    },
+  });
+  const parsed = parseModelJson(readGeminiContent(payload));
+  if (!parsed) throw new ModelError("bad_response");
+  return normalizeModel(input, parsed);
+}
+
+async function postJson(
+  url: string,
+  headers: Record<string, string>,
+  body: unknown,
+): Promise<unknown> {
   let response: Response;
   try {
-    response = await fetch(ENDPOINT, {
+    response = await fetch(url, {
       method: "POST",
       signal: AbortSignal.timeout(45_000),
-      headers: {
-        authorization: `Bearer ${key}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.4,
-        max_tokens: input.format === "both" || input.length === "detailed" ? 1600 : 1100,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: userPrompt(input) },
-        ],
-      }),
+      headers,
+      body: JSON.stringify(body),
     });
   } catch {
     throw new ModelError("unavailable");
   }
-
-  if (response.status === 401 || response.status === 403) {
-    throw new ModelError("unauthorized");
-  }
-  if (!response.ok) {
-    throw new ModelError("unavailable");
-  }
-
-  let payload: unknown;
+  if (response.status === 401 || response.status === 403) throw new ModelError("unauthorized");
+  if (!response.ok) throw new ModelError("unavailable");
   try {
-    payload = await response.json();
+    return await response.json();
   } catch {
     throw new ModelError("bad_response");
   }
-
-  const content = readContent(payload);
-  if (!content) throw new ModelError("bad_response");
-  const parsed = parseModelJson(content);
-  if (!parsed) throw new ModelError("bad_response");
-  return normalizeModel(input, parsed);
 }
 
 const SYSTEM = `You write job application letters and emails for the person whose résumé is in the user message.
@@ -109,7 +158,7 @@ function userPrompt(input: DraftInput): string {
   ].join("\n");
 }
 
-function readContent(payload: unknown): string {
+function readChatContent(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "";
   const choices = (payload as { choices?: unknown }).choices;
   if (!Array.isArray(choices) || !choices[0] || typeof choices[0] !== "object") return "";
@@ -119,8 +168,27 @@ function readContent(payload: unknown): string {
   return typeof content === "string" ? content : "";
 }
 
+function readGeminiContent(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const candidates = (payload as { candidates?: unknown }).candidates;
+  if (!Array.isArray(candidates) || !candidates[0] || typeof candidates[0] !== "object") return "";
+  const content = (candidates[0] as { content?: unknown }).content;
+  if (!content || typeof content !== "object") return "";
+  const parts = (content as { parts?: unknown }).parts;
+  if (!Array.isArray(parts)) return "";
+  return parts
+    .map((part) => {
+      if (!part || typeof part !== "object") return "";
+      if ((part as { thought?: unknown }).thought === true) return "";
+      const text = (part as { text?: unknown }).text;
+      return typeof text === "string" ? text : "";
+    })
+    .join("");
+}
+
 function parseModelJson(content: string): Record<string, unknown> | null {
   const stripped = content.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+  if (!stripped) return null;
   try {
     const value = JSON.parse(stripped) as unknown;
     if (value && typeof value === "object" && !Array.isArray(value)) {

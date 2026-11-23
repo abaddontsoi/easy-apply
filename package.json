@@ -2,15 +2,20 @@
   "name": "cover-desk",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 --port 4747",
     "build": "next build",
-    "start": "next start --hostname 127.0.0.1 --port 4747",
+    "start": "next start --hostname 0.0.0.0",
     "lint": "eslint",
     "test": "tsx --test src/lib/compose.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.119.2",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.2",
     "lucide-react": "^1.78.0",

@@ -1,13 +1,13 @@
 import { ExtractError, extractDocument } from "@/lib/extract";
 import { privateJson } from "@/lib/http";
-import { requireIdentity } from "../../../../cursor/identity";
+import { requireUser } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const identity = await requireIdentity(request);
-  if (identity instanceof Response) return identity;
+  const session = await requireUser();
+  if (session instanceof Response) return session;
 
   let form: FormData;
   try {

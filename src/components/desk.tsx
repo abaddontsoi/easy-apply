@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import type { DraftOutput, Format, Language, Length, Tone, Viewer } from "@/lib/draft";
+import type { DraftMode, DraftOutput, Format, Language, Length, Provider, Tone } from "@/lib/draft";
+import type { ProviderStatus } from "@/lib/models";
 import {
   SAMPLE_COMPANY,
   SAMPLE_JOB,
@@ -22,10 +23,9 @@ import {
   SAMPLE_ROLE,
 } from "@/lib/sample";
 import { cn } from "@/lib/utils";
-import { Copy, Download, FileUp, PenLine } from "lucide-react";
+import { Copy, Download, FileUp, PenLine, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-
-const STORAGE_KEY = "hanjian.draft.v1";
 
 const TONE_ITEMS: Record<Tone, string> = {
   professional: "穩重",
@@ -33,18 +33,15 @@ const TONE_ITEMS: Record<Tone, string> = {
   confident: "自信",
   direct: "直白",
 };
-
 const LENGTH_ITEMS: Record<Length, string> = {
   email: "短電郵",
   letter: "標準信",
   detailed: "較完整",
 };
-
 const LANGUAGE_ITEMS: Record<Language, string> = {
   en: "English",
   "zh-Hant": "繁體中文",
 };
-
 const FORMAT_ITEMS: Record<Format, string> = {
   letter: "求職信",
   email: "應徵電郵",
@@ -53,13 +50,41 @@ const FORMAT_ITEMS: Record<Format, string> = {
 
 type Pane = "letter" | "email";
 
-export function Desk({
-  viewer,
-  modelReady,
-}: {
-  viewer: Viewer | null;
-  modelReady: boolean;
-}) {
+type Summary = {
+  id: string;
+  role: string;
+  company: string;
+  subject: string;
+  provider: Provider;
+  mode: DraftMode;
+  updatedAt: string;
+};
+
+type Stored = Summary & {
+  resume: string;
+  jobDescription: string;
+  hiringManager: string;
+  tone: Tone;
+  length: Length;
+  language: Language;
+  format: Format;
+  letter: string;
+  email: string;
+  usedFacts: string[];
+  omissions: string[];
+  notice: string;
+};
+
+const hongKongTime = new Intl.DateTimeFormat("zh-Hant-HK", {
+  timeZone: "Asia/Hong_Kong",
+  month: "short",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+export function Desk({ email, providers }: { email: string; providers: ProviderStatus }) {
+  const router = useRouter();
   const [resume, setResume] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [company, setCompany] = useState("");
@@ -69,111 +94,206 @@ export function Desk({
   const [length, setLength] = useState<Length>("letter");
   const [language, setLanguage] = useState<Language>("en");
   const [format, setFormat] = useState<Format>("both");
-  const [remember, setRemember] = useState(true);
-  const [ready, setReady] = useState(false);
+  const [provider, setProvider] = useState<Provider>(providers.grok || !providers.gemini ? "grok" : "gemini");
+  const [writtenWith, setWrittenWith] = useState<Provider>("grok");
+  const [letterId, setLetterId] = useState<string | null>(null);
+  const [letters, setLetters] = useState<Summary[]>([]);
+  const [listError, setListError] = useState("");
   const [reading, setReading] = useState(false);
   const [fileNote, setFileNote] = useState("");
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<DraftOutput | null>(null);
   const [letter, setLetter] = useState("");
-  const [email, setEmail] = useState("");
+  const [emailBody, setEmailBody] = useState("");
   const [subject, setSubject] = useState("");
   const [pane, setPane] = useState<Pane>("letter");
   const [copied, setCopied] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const resultRef = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const stored = JSON.parse(raw) as Partial<StoredDraft>;
-        if (stored.remember === false) {
-          setRemember(false);
-        } else {
-          if (typeof stored.resume === "string") setResume(stored.resume);
-          if (typeof stored.jobDescription === "string") setJobDescription(stored.jobDescription);
-          if (typeof stored.company === "string") setCompany(stored.company);
-          if (typeof stored.role === "string") setRole(stored.role);
-          if (typeof stored.hiringManager === "string") setHiringManager(stored.hiringManager);
-          if (isTone(stored.tone)) setTone(stored.tone);
-          if (isLength(stored.length)) setLength(stored.length);
-          if (isLanguage(stored.language)) setLanguage(stored.language);
-          if (isFormat(stored.format)) setFormat(stored.format);
-        }
-      }
-    } catch {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-    setReady(true);
-  }, []);
+  const providerItems: Record<Provider, string> = {
+    grok: providers.grok ? "Grok" : "Grok（未連接）",
+    gemini: providers.gemini ? "Gemini" : "Gemini（未連接）",
+  };
 
   useEffect(() => {
-    if (!ready) return;
-    const payload: StoredDraft = remember
-      ? { remember, resume, jobDescription, company, role, hiringManager, tone, length, language, format }
-      : { remember: false };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  }, [
-    ready,
-    remember,
-    resume,
-    jobDescription,
-    company,
-    role,
-    hiringManager,
-    tone,
-    length,
-    language,
-    format,
-  ]);
+    void loadList(setLetters, setListError);
+  }, []);
 
   useEffect(() => {
     if (!result) return;
     resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [result]);
 
+  function payload() {
+    return {
+      resume,
+      jobDescription,
+      company,
+      role,
+      hiringManager,
+      tone,
+      length,
+      language,
+      format,
+      provider,
+      letterId,
+      subject,
+      letter,
+      email: emailBody,
+      usedFacts: result?.usedFacts ?? [],
+      omissions: result?.omissions ?? [],
+      mode: result?.mode ?? "structured",
+      notice: result?.notice ?? "",
+    };
+  }
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!viewer) return;
     setError("");
     setLoading(true);
     try {
       const response = await fetch("/api/draft", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          resume,
-          jobDescription,
-          company,
-          role,
-          hiringManager,
-          tone,
-          length,
-          language,
-          format,
-        }),
+        body: JSON.stringify(payload()),
       });
-      const payload: unknown = await response.json().catch(() => null);
-      if (!response.ok) {
-        setError(readError(payload) ?? "這次沒有寫成。");
+      const body: unknown = await response.json().catch(() => null);
+      if (response.status === 401) {
+        router.refresh();
         return;
       }
-      if (!isDraft(payload)) {
+      if (!response.ok && !isDraftResponse(body)) {
+        setError(readError(body) ?? "這次沒有寫成。");
+        return;
+      }
+      if (!isDraftResponse(body)) {
         setError("回傳的文稿不完整，請再寫一次。");
         return;
       }
-      setResult(payload);
-      setLetter(payload.letter);
-      setEmail(payload.email);
-      setSubject(payload.subject);
-      setPane(payload.letter ? "letter" : "email");
+      setResult(body);
+      if (body.provider === "grok" || body.provider === "gemini") setWrittenWith(body.provider);
+      setLetter(body.letter);
+      setEmailBody(body.email);
+      setSubject(body.subject);
+      setPane(body.letter ? "letter" : "email");
+      if (body.id) setLetterId(body.id);
+      if (body.saveError) setError(body.saveError);
+      await loadList(setLetters, setListError);
     } catch {
       setError("連不上撰寫服務。");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function saveCurrent() {
+    setError("");
+    setSaving(true);
+    try {
+      const response = await fetch(letterId ? `/api/letters/${letterId}` : "/api/letters", {
+        method: letterId ? "PATCH" : "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload()),
+      });
+      const body: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        setError(readError(body) ?? "沒有存進 Supabase。");
+        return;
+      }
+      const id = body && typeof body === "object" ? (body as { id?: unknown }).id : null;
+      if (typeof id === "string") setLetterId(id);
+      await loadList(setLetters, setListError);
+    } catch {
+      setError("沒有存進 Supabase。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function openLetter(id: string) {
+    setError("");
+    const response = await fetch(`/api/letters/${id}`);
+    const body: unknown = await response.json().catch(() => null);
+    if (!response.ok || !body || typeof body !== "object") {
+      setError(readError(body) ?? "讀不到這封信。");
+      return;
+    }
+    const stored = (body as { letter?: unknown }).letter;
+    if (!isStored(stored)) {
+      setError("這封信的資料不完整。");
+      return;
+    }
+    setLetterId(stored.id);
+    setResume(stored.resume);
+    setJobDescription(stored.jobDescription);
+    setCompany(stored.company);
+    setRole(stored.role);
+    setHiringManager(stored.hiringManager);
+    setTone(stored.tone);
+    setLength(stored.length);
+    setLanguage(stored.language);
+    setFormat(stored.format);
+    setProvider(stored.provider);
+    setWrittenWith(stored.provider);
+    setSubject(stored.subject);
+    setLetter(stored.letter);
+    setEmailBody(stored.email);
+    setResult(
+      stored.letter || stored.email
+        ? {
+            mode: stored.mode,
+            subject: stored.subject,
+            letter: stored.letter,
+            email: stored.email,
+            usedFacts: stored.usedFacts,
+            omissions: stored.omissions,
+            notice: stored.notice,
+          }
+        : null,
+    );
+    setPane(stored.letter ? "letter" : "email");
+  }
+
+  async function deleteLetter(id: string) {
+    if (!window.confirm("從 Supabase 刪掉這封信？")) return;
+    const response = await fetch(`/api/letters/${id}`, { method: "DELETE" });
+    if (!response.ok) {
+      const body: unknown = await response.json().catch(() => null);
+      setError(readError(body) ?? "沒有刪掉。");
+      return;
+    }
+    if (letterId === id) startNew();
+    await loadList(setLetters, setListError);
+  }
+
+  function startNew() {
+    setLetterId(null);
+    setResume("");
+    setJobDescription("");
+    setCompany("");
+    setRole("");
+    setHiringManager("");
+    setResult(null);
+    setLetter("");
+    setEmailBody("");
+    setSubject("");
+    setFileNote("");
+    setError("");
+  }
+
+  function loadSample() {
+    setResume(SAMPLE_RESUME);
+    setJobDescription(SAMPLE_JOB);
+    setCompany(SAMPLE_COMPANY);
+    setRole(SAMPLE_ROLE);
+    setHiringManager("");
+    setLanguage("en");
+    setFormat("both");
+    setFileNote("已載入虛構範例。Chloe Chan 不是真人。按下儲存或撰寫才會寫進 Supabase。");
+    setError("");
   }
 
   async function onFile(file: File | undefined) {
@@ -204,44 +324,18 @@ export function Desk({
     }
   }
 
-  function loadSample() {
-    setResume(SAMPLE_RESUME);
-    setJobDescription(SAMPLE_JOB);
-    setCompany(SAMPLE_COMPANY);
-    setRole(SAMPLE_ROLE);
-    setHiringManager("");
-    setLanguage("en");
-    setFormat("both");
-    setFileNote("已載入虛構範例。Chloe Chan 不是真人。");
-    setError("");
-  }
-
-  function clearAll() {
-    setResume("");
-    setJobDescription("");
-    setCompany("");
-    setRole("");
-    setHiringManager("");
-    setResult(null);
-    setLetter("");
-    setEmail("");
-    setSubject("");
-    setFileNote("");
-    setError("");
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.refresh();
   }
 
   const showLetter = Boolean(letter);
-  const showEmail = Boolean(email);
+  const showEmail = Boolean(emailBody);
   const activePane: Pane = showLetter && showEmail ? pane : showEmail ? "email" : "letter";
-  const activeText = activePane === "email" ? emailWithSubject(subject, email, language) : letter;
+  const activeText = activePane === "email" ? emailWithSubject(subject, emailBody, language) : letter;
 
   return (
     <div className="min-h-screen">
-      {viewer?.simulated ? (
-        <p className="bg-accent px-4 py-2 text-center text-sm text-accent-foreground">
-          本地預覽使用模擬身分，不是你的 Cursor 帳號。發布後只會認出已登入的你。
-        </p>
-      ) : null}
       <header className="border-b border-border/80">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-6">
           <div className="flex items-start gap-3">
@@ -254,28 +348,53 @@ export function Desk({
             <div>
               <h1 className="font-serif text-3xl leading-none tracking-tight">函箋</h1>
               <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-                把履歷和目標職缺放在一起，寫求職信或應徵電郵。文稿只使用履歷裡寫過的事實。
+                履歷和職缺存在 Supabase。文稿由 Grok 或 Gemini 撰寫，只使用履歷裡寫過的事實。
               </p>
             </div>
           </div>
-          <p className="text-sm sm:text-right">
-            {viewer ? (
-              <>
-                <span className="block font-medium">
-                  {viewer.kind === "key" ? `金鑰 ${viewer.name || "未命名"}` : viewer.name || "已登入"}
-                </span>
-                {viewer.email ? (
-                  <span className="text-muted-foreground">{viewer.email}</span>
-                ) : null}
-              </>
-            ) : (
-              <span className="text-muted-foreground">需要登入才能撰寫</span>
-            )}
-          </p>
+          <div className="text-sm sm:text-right">
+            <p className="font-medium">{email}</p>
+            <button type="button" className="text-muted-foreground underline-offset-4 hover:underline" onClick={() => void logout()}>
+              登出
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+      <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[14rem_minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+        <aside className="grid gap-2">
+          <Button type="button" variant="outline" onClick={startNew}>
+            新的一封
+          </Button>
+          {listError ? <p className="text-xs text-destructive">{listError}</p> : null}
+          <ul className="grid gap-1">
+            {letters.length === 0 ? (
+              <li className="px-1 text-sm text-muted-foreground">存進 Supabase 的信會列在這裡。</li>
+            ) : null}
+            {letters.map((item) => (
+              <li key={item.id} className="flex items-start gap-1">
+                <button
+                  type="button"
+                  className={cn(
+                    "min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted",
+                    item.id === letterId && "bg-muted",
+                  )}
+                  onClick={() => void openLetter(item.id)}
+                >
+                  <span className="block truncate font-medium">{item.role || item.subject || "未命名"}</span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {item.company ? `${item.company} · ` : ""}
+                    {hongKongTime.format(new Date(item.updatedAt))}
+                  </span>
+                </button>
+                <Button type="button" variant="ghost" size="icon" onClick={() => void deleteLetter(item.id)} aria-label="刪除">
+                  <Trash2 />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </aside>
+
         <Card>
           <CardHeader>
             <CardTitle className="font-serif text-xl">材料</CardTitle>
@@ -303,19 +422,14 @@ export function Desk({
                     className="sr-only"
                     onChange={(event) => void onFile(event.target.files?.[0])}
                   />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={!viewer || reading}
-                    onClick={() => fileRef.current?.click()}
-                  >
+                  <Button type="button" variant="outline" disabled={reading} onClick={() => fileRef.current?.click()}>
                     <FileUp />
                     {reading ? "讀取中" : "上傳履歷"}
                   </Button>
                   <Button type="button" variant="outline" onClick={loadSample}>
                     載入範例
                   </Button>
-                  <Button type="button" variant="ghost" onClick={clearAll}>
+                  <Button type="button" variant="ghost" onClick={startNew}>
                     清除
                   </Button>
                 </div>
@@ -342,26 +456,13 @@ export function Desk({
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="grid gap-1.5">
                   <Label htmlFor="company">公司</Label>
-                  <Input
-                    id="company"
-                    value={company}
-                    maxLength={120}
-                    onChange={(event) => setCompany(event.target.value)}
-                    placeholder="可不填"
-                  />
+                  <Input id="company" value={company} maxLength={120} onChange={(event) => setCompany(event.target.value)} placeholder="可不填" />
                 </div>
                 <div className="grid gap-1.5">
                   <Label htmlFor="role">職位</Label>
-                  <Input
-                    id="role"
-                    value={role}
-                    maxLength={120}
-                    onChange={(event) => setRole(event.target.value)}
-                    placeholder="可不填"
-                  />
+                  <Input id="role" value={role} maxLength={120} onChange={(event) => setRole(event.target.value)} placeholder="可不填" />
                 </div>
               </div>
-
               <div className="grid gap-1.5">
                 <Label htmlFor="manager">收件人</Label>
                 <Input
@@ -372,61 +473,31 @@ export function Desk({
                   placeholder="知道姓名再填，否則用敬啟者"
                 />
               </div>
-
               <div className="grid gap-3 sm:grid-cols-2">
-                <Choice
-                  label="語氣"
-                  value={tone}
-                  items={TONE_ITEMS}
-                  onChange={(value) => setTone(value)}
-                />
-                <Choice
-                  label="篇幅"
-                  value={length}
-                  items={LENGTH_ITEMS}
-                  onChange={(value) => setLength(value)}
-                />
-                <Choice
-                  label="語言"
-                  value={language}
-                  items={LANGUAGE_ITEMS}
-                  onChange={(value) => setLanguage(value)}
-                />
-                <Choice
-                  label="產出"
-                  value={format}
-                  items={FORMAT_ITEMS}
-                  onChange={(value) => setFormat(value)}
-                />
+                <Choice label="模型" value={provider} items={providerItems} onChange={setProvider} />
+                <Choice label="語氣" value={tone} items={TONE_ITEMS} onChange={setTone} />
+                <Choice label="篇幅" value={length} items={LENGTH_ITEMS} onChange={setLength} />
+                <Choice label="語言" value={language} items={LANGUAGE_ITEMS} onChange={setLanguage} />
+                <Choice label="產出" value={format} items={FORMAT_ITEMS} onChange={setFormat} />
               </div>
-
-              <label className="flex items-start gap-2 text-sm leading-5">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 size-4 accent-primary"
-                  checked={remember}
-                  onChange={(event) => setRemember(event.target.checked)}
-                />
-                <span>在這台瀏覽器記住履歷和職缺。清除或取消勾選就會刪掉。</span>
-              </label>
-
-              {!viewer ? (
-                <p className="rounded-lg bg-muted px-3 py-2 text-sm">需要以 Cursor 登入才能撰寫。這頁仍可閱讀。</p>
-              ) : null}
               {error ? (
                 <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {error}
                 </p>
               ) : null}
-
-              <Button type="submit" size="lg" className="h-10" disabled={!viewer || loading}>
-                <PenLine />
-                {loading ? "正在對照履歷與職缺" : "撰寫"}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" size="lg" className="h-10" disabled={loading}>
+                  <PenLine />
+                  {loading ? "正在對照履歷與職缺" : "撰寫並儲存"}
+                </Button>
+                <Button type="button" variant="outline" className="h-10" disabled={saving} onClick={() => void saveCurrent()}>
+                  {saving ? "儲存中" : "只儲存"}
+                </Button>
+              </div>
               <p className="text-xs leading-5 text-muted-foreground">
-                {modelReady
-                  ? "按下撰寫後，履歷和職缺會送給 OpenAI 生成文稿。函箋不保存這段內容。"
-                  : "尚未連接 OpenAI。按下撰寫會用履歷原句組一份結構草稿，並在文稿上標明。金鑰名稱是 OPENAI_API_KEY。"}
+                {provider === "grok"
+                  ? "履歷、職缺和文稿寫進 Supabase。選 Grok 時，這次內容會送給 xAI。"
+                  : "履歷、職缺和文稿寫進 Supabase。選 Gemini 時，這次內容會送給 Google。"}
               </p>
             </form>
           </CardContent>
@@ -439,7 +510,7 @@ export function Desk({
                 <CardTitle className="font-serif text-xl">文稿</CardTitle>
                 {result ? (
                   <Badge variant={result.mode === "model" ? "default" : "secondary"}>
-                    {result.mode === "model" ? "模型撰寫" : "結構草稿"}
+                    {result.mode === "model" ? (writtenWith === "grok" ? "Grok" : "Gemini") : "結構草稿"}
                   </Badge>
                 ) : null}
               </div>
@@ -449,21 +520,17 @@ export function Desk({
                 <div className="letter-sheet rounded-lg px-5 py-8">
                   <p className="font-serif text-2xl">信會寫在這裡。</p>
                   <ol className="mt-4 grid list-decimal gap-2 pl-4 text-sm leading-6 text-muted-foreground">
-                    <li>貼上履歷，或先載入虛構範例看一次流程。</li>
-                    <li>貼上目標職缺，補上公司、職位和收件人。</li>
-                    <li>選語言和篇幅，撰寫後可以直接改字，再複製或下載。</li>
+                    <li>貼上履歷，或先載入虛構範例。</li>
+                    <li>貼上職缺，選擇 Grok 或 Gemini。</li>
+                    <li>撰寫後可以改字，再儲存、複製或下載。內容在 Supabase。</li>
                   </ol>
                 </div>
               ) : null}
-              {loading ? (
-                <p className="rounded-lg bg-muted px-4 py-8 text-sm">正在對照履歷與職缺，撰寫中。</p>
-              ) : null}
+              {loading ? <p className="rounded-lg bg-muted px-4 py-8 text-sm">正在對照履歷與職缺，撰寫中。</p> : null}
               {result ? (
                 <>
                   {result.notice ? (
-                    <p className="rounded-lg bg-accent px-3 py-2 text-sm leading-6 text-accent-foreground">
-                      {result.notice}
-                    </p>
+                    <p className="rounded-lg bg-accent px-3 py-2 text-sm leading-6 text-accent-foreground">{result.notice}</p>
                   ) : null}
                   {showEmail ? (
                     <div className="grid gap-1.5">
@@ -478,21 +545,16 @@ export function Desk({
                         <TabsTrigger value="email">應徵電郵</TabsTrigger>
                       </TabsList>
                       <TabsContent value="letter" className="pt-3">
-                        <LetterField
-                          id="letter"
-                          value={letter}
-                          language={language}
-                          onChange={setLetter}
-                        />
+                        <LetterField id="letter" value={letter} language={language} onChange={setLetter} />
                       </TabsContent>
                       <TabsContent value="email" className="pt-3">
-                        <LetterField id="email" value={email} language={language} onChange={setEmail} />
+                        <LetterField id="email" value={emailBody} language={language} onChange={setEmailBody} />
                       </TabsContent>
                     </Tabs>
                   ) : showLetter ? (
                     <LetterField id="letter" value={letter} language={language} onChange={setLetter} />
                   ) : (
-                    <LetterField id="email" value={email} language={language} onChange={setEmail} />
+                    <LetterField id="email" value={emailBody} language={language} onChange={setEmailBody} />
                   )}
                   <div className="flex flex-wrap gap-2">
                     <Button type="button" variant="outline" onClick={() => void copyText(activeText, setCopied)}>
@@ -503,10 +565,7 @@ export function Desk({
                       type="button"
                       variant="outline"
                       onClick={() =>
-                        download(
-                          activePane === "email" ? "application-email.txt" : "cover-letter.txt",
-                          activeText,
-                        )
+                        download(activePane === "email" ? "application-email.txt" : "cover-letter.txt", activeText)
                       }
                     >
                       <Download />
@@ -541,6 +600,25 @@ export function Desk({
       </main>
     </div>
   );
+}
+
+async function loadList(
+  setLetters: (letters: Summary[]) => void,
+  setListError: (message: string) => void,
+) {
+  try {
+    const response = await fetch("/api/letters");
+    const body: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+      setListError(readError(body) ?? "讀不到已存的信。");
+      return;
+    }
+    const letters = body && typeof body === "object" ? (body as { letters?: unknown }).letters : null;
+    setLetters(Array.isArray(letters) ? letters.filter(isSummary) : []);
+    setListError("");
+  } catch {
+    setListError("讀不到已存的信。");
+  }
 }
 
 function LetterField({
@@ -603,33 +681,21 @@ function Choice<T extends string>({
   );
 }
 
-type StoredDraft = {
-  remember: boolean;
-  resume?: string;
-  jobDescription?: string;
-  company?: string;
-  role?: string;
-  hiringManager?: string;
-  tone?: Tone;
-  length?: Length;
-  language?: Language;
-  format?: Format;
-};
-
-function isTone(value: unknown): value is Tone {
-  return value === "professional" || value === "warm" || value === "confident" || value === "direct";
-}
-function isLength(value: unknown): value is Length {
-  return value === "email" || value === "letter" || value === "detailed";
-}
-function isLanguage(value: unknown): value is Language {
-  return value === "en" || value === "zh-Hant";
-}
-function isFormat(value: unknown): value is Format {
-  return value === "letter" || value === "email" || value === "both";
+function isSummary(value: unknown): value is Summary {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.id === "string" && typeof record.updatedAt === "string";
 }
 
-function isDraft(value: unknown): value is DraftOutput {
+function isStored(value: unknown): value is Stored {
+  if (!isSummary(value) || !value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.resume === "string" && typeof record.jobDescription === "string" && typeof record.letter === "string";
+}
+
+function isDraftResponse(
+  value: unknown,
+): value is DraftOutput & { id: string | null; saveError?: string; provider?: Provider } {
   if (!value || typeof value !== "object") return false;
   const record = value as Record<string, unknown>;
   return (
@@ -655,9 +721,7 @@ function counterClass(length: number): string {
 
 function measure(text: string, language: Language): string {
   if (!text.trim()) return language === "zh-Hant" ? "0 字" : "0 words";
-  if (language === "zh-Hant") {
-    return `${text.replace(/\s/g, "").length.toLocaleString("zh-Hant")} 字`;
-  }
+  if (language === "zh-Hant") return `${text.replace(/\s/g, "").length.toLocaleString("zh-Hant")} 字`;
   return `${text.trim().split(/\s+/).length.toLocaleString("en")} words`;
 }
 

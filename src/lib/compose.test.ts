@@ -15,6 +15,7 @@ function input(overrides: Partial<DraftInput> = {}): DraftInput {
     length: "letter",
     language: "en",
     format: "both",
+    provider: "grok",
     ...overrides,
   };
 }
@@ -71,5 +72,10 @@ describe("parseDraftInput", () => {
     });
     assert.equal(parsed.ok, true);
     if (parsed.ok) assert.ok(parsed.value.company.length <= 120);
+  });
+
+  it("rejects an unknown model", () => {
+    const parsed = parseDraftInput({ ...input(), provider: "openai" });
+    assert.equal(parsed.ok, false);
   });
 });
