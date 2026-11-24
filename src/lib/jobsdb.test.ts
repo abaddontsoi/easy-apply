@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { JOBSDB_ACTOR_DEFAULTS } from "./jobsdb-actor-input";
 import {
   JOBSDB_ACTOR,
   actorInput,
@@ -37,18 +38,31 @@ describe("parseJobQuery", () => {
       location: "Central",
       maxResults: 20,
     });
-    assert.equal(actorInput(parsed.value).country, "hongkong");
-    assert.equal(actorInput(parsed.value).searchTerm, "software engineer");
-    assert.equal(actorInput(parsed.value).location, "Central");
-    assert.equal(actorInput(parsed.value).sortBy, "ListedDate");
+    const input = actorInput(parsed.value);
+    assert.deepEqual(Object.keys(input).sort(), Object.keys(JOBSDB_ACTOR_DEFAULTS).sort());
+    for (const [key, value] of Object.entries(JOBSDB_ACTOR_DEFAULTS)) {
+      if (key === "searchTerm" || key === "country" || key === "maxResults") continue;
+      assert.equal(value, false);
+      assert.equal(input[key], false);
+    }
+    assert.equal(input.country, "hongkong");
+    assert.equal(input.searchTerm, "software engineer");
+    assert.equal(input.maxResults, 20);
+    assert.equal("location" in input, false);
     assert.equal(JOBSDB_ACTOR, "websift/seek-job-scraper");
   });
 
   it("accepts Thailand and rejects other actor countries", () => {
     const thailand = parseJobQuery({ keyword: "accountant", country: "thailand", maxResults: "12" });
     assert.equal(thailand.ok, true);
-    if (thailand.ok) assert.equal(thailand.value.country, "thailand");
-    assert.equal(thailand.ok && actorInput(thailand.value).location, undefined);
+    if (thailand.ok) {
+      assert.equal(thailand.value.country, "thailand");
+      const input = actorInput(thailand.value);
+      assert.equal(input.country, "thailand");
+      assert.equal(input.searchTerm, "accountant");
+      assert.equal(input.maxResults, 12);
+      assert.equal(input.requireEmail, false);
+    }
 
     const australia = parseJobQuery({ keyword: "engineer", country: "australia" });
     assert.equal(australia.ok, false);
