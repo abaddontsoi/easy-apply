@@ -11,9 +11,14 @@ type QueryResult = {
   count: number | null;
 };
 
-export function createMemoryDataClient(rows: MemoryLetter[], options?: { errorCode?: string }) {
+export function createMemoryDataClient(
+  rows: MemoryLetter[],
+  options?: { errorCode?: string; secrets?: MemoryLetter[]; secretsError?: string },
+) {
+  const secrets = options?.secrets ?? [];
   return {
     from(table: string) {
+      if (table === "user_secrets") return new LetterQuery(secrets, options?.secretsError);
       const errorCode = table === "letters" ? options?.errorCode : "42P01";
       return new LetterQuery(rows, errorCode);
     },

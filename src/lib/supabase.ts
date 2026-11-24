@@ -38,6 +38,7 @@ type AuthClient = NonNullable<Awaited<ReturnType<typeof openAuthClient>>>;
 let authFactory: (() => Promise<SupabaseAuthDouble | null>) | null = null;
 let dataFactory: (() => SupabaseClient | null) | null = null;
 let e2eLetters: MemoryLetter[] | null = null;
+let e2eSecrets: MemoryLetter[] | null = null;
 
 export function supabaseConfigured(): boolean {
   if (e2eDeskEnabled()) return true;
@@ -47,6 +48,28 @@ export function supabaseConfigured(): boolean {
 export function supabaseConfigurationIssues(): SetupIssue[] {
   if (e2eDeskEnabled()) return [];
   return supabaseSetupIssues(currentSupabaseEnv());
+}
+
+export function allowServiceUserForTests(): void {
+  const user = { id: "00000000-0000-4000-8000-0000000000aa", email: "writer@example.com" };
+  setSupabaseTestDoubles({
+    createAuthClient: async () => ({
+      auth: {
+        async getUser() {
+          return { data: { user }, error: null };
+        },
+        async signInWithPassword() {
+          return { data: { user, session: {} }, error: null };
+        },
+        async signUp() {
+          return { data: { user, session: {} }, error: null };
+        },
+        async signOut() {
+          return { error: null };
+        },
+      },
+    }),
+  });
 }
 
 export function setSupabaseTestDoubles(
@@ -156,5 +179,6 @@ function e2eAuthClient(): SupabaseAuthDouble {
 
 function e2eDataClient(): SupabaseClient {
   e2eLetters ??= [];
-  return createMemoryDataClient(e2eLetters) as unknown as SupabaseClient;
+  e2eSecrets ??= [];
+  return createMemoryDataClient(e2eLetters, { secrets: e2eSecrets }) as unknown as SupabaseClient;
 }

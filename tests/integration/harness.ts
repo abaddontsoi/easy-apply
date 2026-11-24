@@ -78,11 +78,13 @@ type Account = { id: string; email: string; password: string };
 
 export type Desk = {
   rows: MemoryLetter[];
+  secrets: MemoryLetter[];
   signInAs: (userId: string | null) => void;
 };
 
 export function installDesk(users: { id: string; email: string; password?: string }[]): Desk {
   const rows: MemoryLetter[] = [];
+  const secrets: MemoryLetter[] = [];
   const accounts = new Map<string, Account>();
   for (const user of users) {
     accounts.set(user.email, { id: user.id, email: user.email, password: user.password ?? "password-ok" });
@@ -97,10 +99,11 @@ export function installDesk(users: { id: string; email: string; password?: strin
           current = next;
         },
       ),
-    createDataClient: () => createMemoryDataClient(rows) as unknown as SupabaseClient,
+    createDataClient: () => createMemoryDataClient(rows, { secrets }) as unknown as SupabaseClient,
   });
   return {
     rows,
+    secrets,
     signInAs(userId: string | null) {
       current = [...accounts.values()].find((account) => account.id === userId) ?? null;
     },

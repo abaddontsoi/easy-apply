@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { afterEach, describe, it } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import type { DraftInput } from "./draft";
 import { fallbackNotice, ModelError, providerReady, providerStatus, writeWithModel } from "./models";
+import { UnauthenticatedError } from "./session";
+import { allowServiceUserForTests, setSupabaseTestDoubles } from "./supabase";
 
 const FAKE_KEY = "unit-test-key";
 const KEYS = ["XAI_API_KEY", "GEMINI_API_KEY"] as const;
@@ -9,7 +11,12 @@ const savedKeys = new Map<string, string | undefined>();
 const originalFetch = globalThis.fetch;
 
 describe("model helpers", { concurrency: 1 }, () => {
+  beforeEach(() => {
+    allowServiceUserForTests();
+  });
+
   afterEach(() => {
+    setSupabaseTestDoubles(null);
     for (const [key, value] of savedKeys) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
@@ -27,6 +34,7 @@ describe("model helpers", { concurrency: 1 }, () => {
     process.env.GEMINI_API_KEY = FAKE_KEY;
     assert.equal(providerReady("grok"), false);
     assert.equal(providerReady("gemini"), true);
+    assert.equal(providerStatus({ grok: "user-owned-key", gemini: "" }).grok, true);
   });
 
   it("describes a missing key, a rejected key, and an unavailable model", () => {
@@ -64,6 +72,23 @@ describe("model helpers", { concurrency: 1 }, () => {
     assert.equal(body.model, "grok-4.7");
   });
 
+  it("sends the saved Grok key and leaves the system key unused", async () => {
+    rememberKeys();
+    process.env.XAI_API_KEY = "system-key-unused";
+    const calls = stubFetch(
+      chat({
+        subject: "Hello",
+        letter: "Letter body.",
+        email: "",
+        usedFacts: ["fact"],
+        omissions: [],
+      }),
+    );
+    await writeWithModel(input({ format: "letter" }), { grok: "user-owned-key", gemini: "" });
+    assert.equal(new Headers(calls[0]?.init.headers).get("authorization"), "Bearer user-owned-key");
+    assert.equal(fallbackNotice("grok", "unauthorized", "user").includes("設定頁"), true);
+  });
+
   it("reads Gemini text and skips thought parts", async () => {
     rememberKeys();
     process.env.GEMINI_API_KEY = FAKE_KEY;
@@ -93,6 +118,19 @@ describe("model helpers", { concurrency: 1 }, () => {
     assert.doesNotMatch(draft.email, /hidden reasoning/);
     assert.match(calls[0]?.url ?? "", /generativelanguage\.googleapis\.com/);
     assert.equal(geminiKeyMatches(calls[0]?.init), true);
+  });
+
+  it("does not call the model when authentication fails", async () => {
+    rememberKeys();
+    setSupabaseTestDoubles(null);
+    process.env.XAI_API_KEY = FAKE_KEY;
+    let called = false;
+    globalThis.fetch = (async () => {
+      called = true;
+      throw new Error("network");
+    }) as typeof fetch;
+    await assert.rejects(writeWithModel(input()), (error: unknown) => error instanceof UnauthenticatedError);
+    assert.equal(called, false);
   });
 
   it("does not call the network when the key is missing", async () => {

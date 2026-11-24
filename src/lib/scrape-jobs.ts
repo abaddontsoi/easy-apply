@@ -1,5 +1,7 @@
 import { ApifyClient } from "apify-client";
+import { resolveApifyToken } from "@/lib/credentials";
 import { JOBSDB_ACTOR, JobsError, actorInput, normalizeJobs, type JobQuery, type ScrapedJob } from "@/lib/jobsdb";
+import { authenticateCaller } from "@/lib/session";
 
 export type JobRunner = (input: Record<string, unknown>) => Promise<unknown[]>;
 
@@ -15,14 +17,19 @@ export function setJobRunnerForTests(runner: JobRunner | null): void {
   testRunner = runner;
 }
 
-export async function scrapeJobsdb(query: JobQuery): Promise<ScrapedJob[]> {
-  const items = await (testRunner ?? runWithApify)(actorInput(query));
+export async function scrapeJobsdb(query: JobQuery, userToken = ""): Promise<ScrapedJob[]> {
+  await authenticateCaller();
+  const token = resolveApifyToken(userToken).value;
+  if (testRunner) {
+    const items = await testRunner(actorInput(query));
+    return normalizeJobs(items);
+  }
+  if (!token) throw new JobsError("missing_token");
+  const items = await runWithApify(actorInput(query), token);
   return normalizeJobs(items);
 }
 
-async function runWithApify(input: Record<string, unknown>): Promise<unknown[]> {
-  const token = readApifyToken();
-  if (!token) throw new JobsError("missing_token");
+async function runWithApify(input: Record<string, unknown>, token: string): Promise<unknown[]> {
   const client = new ApifyClient({ token });
   const maxResults = typeof input.maxResults === "number" ? input.maxResults : 10;
   let run;
@@ -53,14 +60,3 @@ async function runWithApify(input: Record<string, unknown>): Promise<unknown[]> 
   }
 }
 
-function readApifyToken(): string | null {
-  let token = process.env.APIFY_TOKEN?.trim() ?? "";
-  if (
-    (token.startsWith("\"") && token.endsWith("\"")) ||
-    (token.startsWith("'") && token.endsWith("'"))
-  ) {
-    token = token.slice(1, -1).trim();
-  }
-  if (!token || /\s/.test(token)) return null;
-  return token;
-}

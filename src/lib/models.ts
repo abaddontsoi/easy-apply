@@ -1,5 +1,7 @@
 import { composeStructured } from "@/lib/compose";
+import { EMPTY_KEYS, resolveModelKey, type KeySource, type ModelKeys } from "@/lib/credentials";
 import type { DraftInput, DraftOutput, Length, Provider } from "@/lib/draft";
+import { authenticateCaller } from "@/lib/session";
 
 const GROK_MODEL = "grok-4.7";
 const GEMINI_MODEL = "gemini-3.5-flash-lite";
@@ -17,15 +19,15 @@ export type ProviderStatus = {
   gemini: boolean;
 };
 
-export function providerStatus(): ProviderStatus {
+export function providerStatus(keys: ModelKeys = EMPTY_KEYS): ProviderStatus {
   return {
-    grok: Boolean(process.env.XAI_API_KEY?.trim()),
-    gemini: Boolean(process.env.GEMINI_API_KEY?.trim()),
+    grok: Boolean(resolveModelKey("grok", keys).value),
+    gemini: Boolean(resolveModelKey("gemini", keys).value),
   };
 }
 
-export function providerReady(provider: Provider): boolean {
-  return providerStatus()[provider];
+export function providerReady(provider: Provider, keys: ModelKeys = EMPTY_KEYS): boolean {
+  return Boolean(resolveModelKey(provider, keys).value);
 }
 
 export class ModelError extends Error {
@@ -38,17 +40,28 @@ export class ModelError extends Error {
   }
 }
 
-export async function writeWithModel(input: DraftInput): Promise<DraftOutput> {
-  if (input.provider === "grok") return writeWithGrok(input);
-  return writeWithGemini(input);
+export async function writeWithModel(input: DraftInput, keys: ModelKeys = EMPTY_KEYS): Promise<DraftOutput> {
+  await authenticateCaller();
+  const resolved = resolveModelKey(input.provider, keys);
+  if (!resolved.value) throw new ModelError("unauthorized");
+  if (input.provider === "grok") return writeWithGrok(input, resolved.value);
+  return writeWithGemini(input, resolved.value);
 }
 
-export function fallbackNotice(provider: Provider, code: ModelError["code"] | "missing"): string {
+export function fallbackNotice(
+  provider: Provider,
+  code: ModelError["code"] | "missing",
+  source: KeySource = "system",
+): string {
   if (code === "missing") {
     const name = provider === "grok" ? "Grok" : "Gemini";
     return `尚未連接 ${name}，所以這是結構草稿。句子來自履歷原文，不會補上沒有的成就。`;
   }
   if (code === "unauthorized") {
+    if (source === "user") {
+      const name = provider === "grok" ? "Grok" : "Gemini";
+      return `${name} 沒有接受你在設定頁儲存的金鑰，所以改用結構草稿。`;
+    }
     return provider === "grok"
       ? "Grok 沒有接受這把金鑰，所以改用結構草稿。請在 Infisical 檢查 XAI_API_KEY。"
       : "Gemini 沒有接受這把金鑰，所以改用結構草稿。請在 Infisical 檢查 GEMINI_API_KEY。";
@@ -57,9 +70,7 @@ export function fallbackNotice(provider: Provider, code: ModelError["code"] | "m
   return `${name} 這次沒有完成，所以改用結構草稿。句子仍來自履歷原文。`;
 }
 
-async function writeWithGrok(input: DraftInput): Promise<DraftOutput> {
-  const key = process.env.XAI_API_KEY?.trim();
-  if (!key) throw new ModelError("unauthorized");
+async function writeWithGrok(input: DraftInput, key: string): Promise<DraftOutput> {
   const payload = await postJson(GROK_ENDPOINT, {
     authorization: `Bearer ${key}`,
     "content-type": "application/json",
@@ -77,9 +88,7 @@ async function writeWithGrok(input: DraftInput): Promise<DraftOutput> {
   return normalizeModel(input, parsed);
 }
 
-async function writeWithGemini(input: DraftInput): Promise<DraftOutput> {
-  const key = process.env.GEMINI_API_KEY?.trim();
-  if (!key) throw new ModelError("unauthorized");
+async function writeWithGemini(input: DraftInput, key: string): Promise<DraftOutput> {
   const payload = await postJson(GEMINI_ENDPOINT, {
     "content-type": "application/json",
     "x-goog-api-key": key,

@@ -25,6 +25,7 @@ import {
 import { cn } from "@/lib/utils";
 import { JobSearch } from "@/components/job-search";
 import { Copy, Download, FileUp, PenLine, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -84,7 +85,15 @@ const hongKongTime = new Intl.DateTimeFormat("zh-Hant-HK", {
   minute: "2-digit",
 });
 
-export function Desk({ email, providers }: { email: string; providers: ProviderStatus }) {
+export function Desk({
+  email,
+  providers,
+  keyWarning = "",
+}: {
+  email: string;
+  providers: ProviderStatus;
+  keyWarning?: string;
+}) {
   const router = useRouter();
   const [resume, setResume] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -336,9 +345,9 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
   const activeText = activePane === "email" ? emailWithSubject(subject, emailBody, language) : letter;
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-border/80">
-        <div className="mx-auto flex max-w-[1760px] flex-col gap-4 px-4 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-6 xl:px-8">
+    <div className="flex h-dvh flex-col overflow-hidden">
+      <header className="shrink-0 border-b border-border/80">
+        <div className="flex w-full flex-col gap-3 px-4 py-3 sm:flex-row sm:items-end sm:justify-between sm:px-5">
           <div className="flex items-start gap-3">
             <div
               aria-hidden
@@ -352,15 +361,22 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
           </div>
           <div className="text-sm sm:text-right">
             <p className="font-medium">{email}</p>
-            <button type="button" className="text-muted-foreground underline-offset-4 hover:underline" onClick={() => void logout()}>
-              登出
-            </button>
+            <p className="text-muted-foreground">
+              <Link href="/settings" className="underline-offset-4 hover:underline">
+                設定
+              </Link>
+              <span aria-hidden> · </span>
+              <button type="button" className="underline-offset-4 hover:underline" onClick={() => void logout()}>
+                登出
+              </button>
+            </p>
+            {keyWarning ? <p className="mt-1 text-xs text-destructive">{keyWarning}</p> : null}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto grid w-full min-w-0 max-w-[1760px] items-start gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_minmax(0,1fr)] xl:gap-8 xl:px-8">
-        <aside className="grid min-w-0 gap-2 overflow-hidden">
+      <main className="grid min-h-0 w-full flex-1 items-stretch gap-4 overflow-y-auto px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_minmax(0,1fr)] lg:overflow-hidden">
+        <aside className="grid min-h-0 min-w-0 content-start gap-2 overflow-hidden lg:overflow-y-auto">
           <Button type="button" variant="outline" className="w-full min-w-0 max-w-full" onClick={startNew}>
             新的一封
           </Button>
@@ -393,7 +409,7 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
           </ul>
         </aside>
 
-        <Card className="min-w-0">
+        <Card className="h-full min-h-0 min-w-0 lg:overflow-y-auto">
           <CardHeader>
             <CardTitle className="font-serif text-xl">材料</CardTitle>
           </CardHeader>
@@ -510,8 +526,8 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
           </CardContent>
         </Card>
 
-        <section ref={resultRef} aria-live="polite" className="min-w-0">
-          <Card className="min-w-0 lg:sticky lg:top-4">
+        <section ref={resultRef} aria-live="polite" className="flex h-full min-h-0 min-w-0 flex-col">
+          <Card className="h-full min-h-0 min-w-0 flex-1 lg:overflow-y-auto">
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
                 <CardTitle className="font-serif text-xl">文稿</CardTitle>
@@ -645,7 +661,7 @@ function LetterField({
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="letter-sheet field-sizing-fixed min-h-[28rem] w-full max-w-full resize-y px-4 py-4 font-serif text-base leading-7 md:text-base"
+        className="letter-sheet field-sizing-fixed min-h-[calc(100dvh-18rem)] w-full max-w-full resize-y px-4 py-4 font-serif text-base leading-7 md:text-base"
       />
       <p className="text-xs text-muted-foreground">{measure(value, language)}</p>
     </div>

@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { JOBSDB_ACTOR_DEFAULTS } from "./jobsdb-actor-input";
 import {
   JOBSDB_ACTOR,
   actorInput,
@@ -39,16 +38,21 @@ describe("parseJobQuery", () => {
       maxResults: 20,
     });
     const input = actorInput(parsed.value);
-    assert.deepEqual(Object.keys(input).sort(), Object.keys(JOBSDB_ACTOR_DEFAULTS).sort());
-    for (const [key, value] of Object.entries(JOBSDB_ACTOR_DEFAULTS)) {
-      if (key === "searchTerm" || key === "country" || key === "maxResults") continue;
-      assert.equal(value, false);
-      assert.equal(input[key], false);
-    }
-    assert.equal(input.country, "hongkong");
-    assert.equal(input.searchTerm, "software engineer");
-    assert.equal(input.maxResults, 20);
-    assert.equal("location" in input, false);
+    assert.deepEqual(input, {
+      searchTerm: "software engineer",
+      country: "hongkong",
+      maxResults: 20,
+      requireEmail: false,
+      requirePhone: false,
+      requireEmailPhone: false,
+      includeOneInTitle: [],
+      location: "Central",
+      workTypes: [],
+      workArrangements: [],
+      subclassifications: false,
+    });
+    assert.equal("accounting" in input, false);
+    assert.equal("searchUrl" in input, false);
     assert.equal(JOBSDB_ACTOR, "websift/seek-job-scraper");
   });
 

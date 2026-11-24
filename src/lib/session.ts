@@ -8,6 +8,15 @@ export type Session = {
   email: string;
 };
 
+export class UnauthenticatedError extends Error {
+  readonly code = "unauthenticated";
+
+  constructor() {
+    super("unauthenticated");
+    this.name = "UnauthenticatedError";
+  }
+}
+
 export async function currentUser(): Promise<{ email: string } | null> {
   if (!supabaseConfigured()) return null;
   const supabase = await createAuthClient();
@@ -15,6 +24,20 @@ export async function currentUser(): Promise<{ email: string } | null> {
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user?.email) return null;
   return { email: data.user.email };
+}
+
+export async function authenticateCaller(): Promise<{ id: string; email: string }> {
+  try {
+    const auth = await createAuthClient();
+    if (!auth) throw new UnauthenticatedError();
+    const { data, error } = await auth.auth.getUser();
+    const user = data.user;
+    if (error || !user?.id || !user.email) throw new UnauthenticatedError();
+    return { id: user.id, email: user.email };
+  } catch (error) {
+    if (error instanceof UnauthenticatedError) throw error;
+    throw new UnauthenticatedError();
+  }
 }
 
 export async function requireUser(): Promise<Session | Response> {

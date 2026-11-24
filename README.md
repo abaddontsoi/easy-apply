@@ -9,7 +9,7 @@ Accounts, résumés, job descriptions, and letters live in Supabase. Nothing is 
 ## Supabase
 
 1. Create a project.
-2. In the SQL editor, run `supabase/migrations/0001_letters.sql`, then `supabase/migrations/0002_lock_letters.sql`.
+2. In the SQL editor, run `supabase/migrations/0001_letters.sql`, then `supabase/migrations/0002_lock_letters.sql`, then `supabase/migrations/0003_user_secrets.sql`.
 3. Enable email sign-in. Set the Site URL to the Railway URL.
 4. In Settings → API Keys, open Publishable and secret keys. Create the publishable key and a secret key used only by this app. Disable the legacy `anon` and `service_role` keys. Do not copy a key that starts with `eyJ`.
 
@@ -28,7 +28,9 @@ Infisical is the only place these values are stored. The app still reads `proces
 
 Either model key can be omitted. The missing model falls back to a labeled structured draft, which is still stored in Supabase. `APIFY_TOKEN` can be omitted too; the desk still writes letters, and JobsDB search reports that the token is missing. Keep both Supabase keys and the Apify token server-side. Do not prefix the secret key with `NEXT_PUBLIC_`, and do not store a legacy `anon` or `service_role` key.
 
-JobsDB search calls the Apify actor `websift/seek-job-scraper` through `apify-client`. Hong Kong uses `hk.jobsdb.com` (`country: hongkong`) and Thailand uses `th.jobsdb.com` (`country: thailand`). The run input includes every actor field. Classification flags, salary lookup, and contact filters stay `false`. Only `searchTerm`, `country`, and `maxResults` change. A search asks for 10 to 20 listings and stops the run if it would cost more than USD 0.15. Listings stay in the browser until the user writes or saves a letter.
+A signed-in user can save their own Grok, Gemini, and Apify keys on the settings page. Those values live in `user_secrets`, locked the same way as `letters`. The browser receives only a mask of the last four characters. When a personal key is saved, writing and JobsDB search use that key and do not fall back to the Infisical value. Clearing it returns that provider to the system key. Grok, Gemini, and Apify are contacted only after the signed-in session authenticates successfully.
+
+JobsDB search calls the Apify actor `websift/seek-job-scraper` through `apify-client`. Hong Kong uses `hk.jobsdb.com` (`country: hongkong`) and Thailand uses `th.jobsdb.com` (`country: thailand`). The run uses the actor's filter fields. Contact filters stay `false`. Work type, work arrangement, and classification filters are left empty, so the actor keeps every option enabled. Salary, date, radius, and `searchUrl` are omitted unless a value is set. A search asks for 10 to 20 listings and stops the run if it would cost more than USD 0.15. Listings stay in the browser until the user writes or saves a letter.
 
 If `SUPABASE_URL` or `SUPABASE_PUBLISHABLE_KEY` is empty, the server also reads `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. A value wrapped in one pair of quotes is accepted. The setup screen names the variable that is missing or rejected, and it never prints the value. A publishable key must start with `sb_publishable_`. A secret key must start with `sb_secret_`. The URL must be `https`, except `http://localhost` and `http://127.0.0.1`.
 
