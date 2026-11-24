@@ -7,12 +7,14 @@ test("writes a structured draft on the signed-in desk", async ({ page }) => {
   await expect(page.getByText("存進 Supabase 的信會列在這裡。")).toBeVisible();
 
   await page.getByRole("navigation", { name: "主要" }).getByRole("link", { name: "設定", exact: true }).click();
-  await page.getByRole("button", { name: "載入範例" }).click();
-  await expect(page.getByLabel("履歷文字")).toContainText("Chloe Chan");
+  await expect(page.getByRole("heading", { name: "設定", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "載入範例", exact: true }).click();
+  await expect(page.getByLabel("履歷文字")).toHaveValue(/Chloe Chan/);
   await expect(page.getByText("範例文字會存進 Supabase")).toBeVisible();
-  await page.getByRole("link", { name: "寫作新信件" }).click();
+  await page.getByRole("navigation", { name: "主要" }).getByRole("link", { name: "寫作新信件", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "寫作新信件", exact: true })).toBeVisible();
   await expect(page.getByText("Chloe Chan").first()).toBeVisible();
-  await page.getByRole("button", { name: "載入範例" }).click();
+  await page.getByRole("button", { name: "載入範例", exact: true }).click();
   await expect(page.getByLabel("職缺說明")).toContainText("Kubernetes");
 
   await page.getByRole("button", { name: "撰寫並儲存" }).click();
