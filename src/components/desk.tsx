@@ -113,6 +113,7 @@ export function Desk({
   const [letter, setLetter] = useState("");
   const [emailBody, setEmailBody] = useState("");
   const [subject, setSubject] = useState("");
+  const [instruction, setInstruction] = useState("");
   const [pane, setPane] = useState<Pane>("letter");
   const [copied, setCopied] = useState(false);
   const resultRef = useRef<HTMLElement>(null);
@@ -154,6 +155,7 @@ export function Desk({
     setLetter("");
     setEmailBody("");
     setSubject("");
+    setInstruction("");
     setError("");
     queueMicrotask(() => clearSelectedJob());
   }, []);
@@ -188,38 +190,51 @@ export function Desk({
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+    await sendDraft(payload());
+  }
+
+  async function revise() {
+    const text = instruction.trim();
+    if (!text || loading) return;
+    const wrote = await sendDraft({ ...payload(), instruction: text });
+    if (wrote) setInstruction("");
+  }
+
+  async function sendDraft(body: Record<string, unknown>): Promise<boolean> {
     setError("");
     setLoading(true);
     try {
       const response = await fetch("/api/draft", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload()),
+        body: JSON.stringify(body),
       });
-      const body: unknown = await response.json().catch(() => null);
+      const payloadBody: unknown = await response.json().catch(() => null);
       if (response.status === 401) {
         router.refresh();
-        return;
+        return false;
       }
-      if (!response.ok && !isDraftResponse(body)) {
-        setError(readError(body) ?? "這次沒有寫成。");
-        return;
+      if (!response.ok && !isDraftResponse(payloadBody)) {
+        setError(readError(payloadBody) ?? "這次沒有寫成。");
+        return false;
       }
-      if (!isDraftResponse(body)) {
+      if (!isDraftResponse(payloadBody)) {
         setError("回傳的文稿不完整，請再寫一次。");
-        return;
+        return false;
       }
-      setResult(body);
-      if (body.provider === "grok" || body.provider === "gemini") setWrittenWith(body.provider);
-      setLetter(body.letter);
-      setEmailBody(body.email);
-      setSubject(body.subject);
-      setPane(body.letter ? "letter" : "email");
-      if (body.id) setLetterId(body.id);
-      if (body.saveError) setError(body.saveError);
+      setResult(payloadBody);
+      if (payloadBody.provider === "grok" || payloadBody.provider === "gemini") setWrittenWith(payloadBody.provider);
+      setLetter(payloadBody.letter);
+      setEmailBody(payloadBody.email);
+      setSubject(payloadBody.subject);
+      setPane(payloadBody.letter ? "letter" : "email");
+      if (payloadBody.id) setLetterId(payloadBody.id);
+      if (payloadBody.saveError) setError(payloadBody.saveError);
       await loadList(setLetters, setListError);
+      return true;
     } catch {
       setError("連不上撰寫服務。");
+      return false;
     } finally {
       setLoading(false);
     }
@@ -276,6 +291,7 @@ export function Desk({
     setSubject(stored.subject);
     setLetter(stored.letter);
     setEmailBody(stored.email);
+    setInstruction("");
     setResult(
       stored.letter || stored.email
         ? {
@@ -315,6 +331,7 @@ export function Desk({
     setLetter("");
     setEmailBody("");
     setSubject("");
+    setInstruction("");
     setError("");
   }
 
@@ -501,6 +518,30 @@ export function Desk({
                   {result.notice ? (
                     <p className="rounded-lg bg-accent px-3 py-2 text-sm leading-6 text-accent-foreground">{result.notice}</p>
                   ) : null}
+                  <div className="grid gap-1.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label htmlFor="instruction">修改指示</Label>
+                      <span className="text-xs text-muted-foreground">{instruction.trim().length} / 300</span>
+                    </div>
+                    <Textarea
+                      id="instruction"
+                      value={instruction}
+                      maxLength={300}
+                      onChange={(event) => setInstruction(event.target.value)}
+                      placeholder="例如把開頭寫短，並不要加入履歷沒有的工具。"
+                      className="field-sizing-fixed min-h-20 w-full max-w-full resize-y"
+                    />
+                    <div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={loading || instruction.trim().length === 0}
+                        onClick={() => void revise()}
+                      >
+                        {loading ? "正在對照履歷與職缺" : "按指示改寫"}
+                      </Button>
+                    </div>
+                  </div>
                   {showEmail ? (
                     <div className="grid gap-1.5">
                       <Label htmlFor="subject">主旨</Label>

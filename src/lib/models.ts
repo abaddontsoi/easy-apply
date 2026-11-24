@@ -40,12 +40,32 @@ export class ModelError extends Error {
   }
 }
 
-export async function writeWithModel(input: DraftInput, keys: ModelKeys = EMPTY_KEYS): Promise<DraftOutput> {
+export type ModelRevision = {
+  instruction: string;
+  subject: string;
+  letter: string;
+  email: string;
+};
+
+const RETRY_HINT =
+  "The previous reply was unusable. Return one JSON object. subject, and the prose required by Format, must be non-empty.";
+
+export async function writeWithModel(
+  input: DraftInput,
+  keys: ModelKeys = EMPTY_KEYS,
+  revision?: ModelRevision,
+): Promise<DraftOutput> {
   await authenticateCaller();
   const resolved = resolveModelKey(input.provider, keys);
   if (!resolved.value) throw new ModelError("unauthorized");
-  if (input.provider === "grok") return writeWithGrok(input, resolved.value);
-  return writeWithGemini(input, resolved.value);
+  const system = revision ? REVISE_SYSTEM : SYSTEM;
+  const userText = userPrompt(input, revision);
+  try {
+    return await completeOnce(input, resolved.value, system, userText);
+  } catch (error) {
+    if (!(error instanceof ModelError) || error.code !== "bad_response") throw error;
+  }
+  return completeOnce(input, resolved.value, system, `${userText}\n\n${RETRY_HINT}`);
 }
 
 export function fallbackNotice(
@@ -70,38 +90,48 @@ export function fallbackNotice(
   return `${name} 這次沒有完成，所以改用結構草稿。句子仍來自履歷原文。`;
 }
 
-async function writeWithGrok(input: DraftInput, key: string): Promise<DraftOutput> {
-  const payload = await postJson(GROK_ENDPOINT, {
-    authorization: `Bearer ${key}`,
-    "content-type": "application/json",
-  }, {
-    model: GROK_MODEL,
-    temperature: 0.4,
-    max_tokens: 4000,
-    messages: [
-      { role: "system", content: SYSTEM },
-      { role: "user", content: userPrompt(input) },
-    ],
-  });
-  const parsed = parseModelJson(readChatContent(payload));
-  if (!parsed) throw new ModelError("bad_response");
-  return normalizeModel(input, parsed);
-}
-
-async function writeWithGemini(input: DraftInput, key: string): Promise<DraftOutput> {
-  const payload = await postJson(GEMINI_ENDPOINT, {
-    "content-type": "application/json",
-    "x-goog-api-key": key,
-  }, {
-    systemInstruction: { parts: [{ text: SYSTEM }] },
-    contents: [{ role: "user", parts: [{ text: userPrompt(input) }] }],
-    generationConfig: {
-      temperature: 0.4,
-      maxOutputTokens: 4000,
-      responseMimeType: "application/json",
-    },
-  });
-  const parsed = parseModelJson(readGeminiContent(payload));
+async function completeOnce(
+  input: DraftInput,
+  key: string,
+  system: string,
+  userText: string,
+): Promise<DraftOutput> {
+  const payload =
+    input.provider === "grok"
+      ? await postJson(
+          GROK_ENDPOINT,
+          {
+            authorization: `Bearer ${key}`,
+            "content-type": "application/json",
+          },
+          {
+            model: GROK_MODEL,
+            temperature: 0.4,
+            max_tokens: 4000,
+            messages: [
+              { role: "system", content: system },
+              { role: "user", content: userText },
+            ],
+          },
+        )
+      : await postJson(
+          GEMINI_ENDPOINT,
+          {
+            "content-type": "application/json",
+            "x-goog-api-key": key,
+          },
+          {
+            systemInstruction: { parts: [{ text: system }] },
+            contents: [{ role: "user", parts: [{ text: userText }] }],
+            generationConfig: {
+              temperature: 0.4,
+              maxOutputTokens: 4000,
+              responseMimeType: "application/json",
+            },
+          },
+        );
+  const text = input.provider === "grok" ? readChatContent(payload) : readGeminiContent(payload);
+  const parsed = parseModelJson(text);
   if (!parsed) throw new ModelError("bad_response");
   return normalizeModel(input, parsed);
 }
@@ -144,9 +174,22 @@ When format is both, the email is shorter than the letter.
 Sign with the name on the résumé when one is present.
 If company, role, or hiring manager is blank, use those words only when the job description states them. Otherwise stay generic ("the role", "貴公司這個職位").`;
 
-function userPrompt(input: DraftInput): string {
+const REVISE_SYSTEM = `You revise a job application letter or email for the person whose résumé is in the user message.
+Apply the writer's instruction. Keep every other sentence as close to the current draft as you can.
+Use only facts that appear in the résumé. Never invent employers, titles, dates, metrics, tools, degrees, languages, or outcomes.
+If a job requirement is not supported by the résumé, put a short phrase for it in omissions and do not claim it in the prose.
+Do not flatter. Do not use the words passionate, dynamic, synergy, leverage, or "I am writing to express".
+Write in the requested language. Plain text only, no markdown.
+Return a JSON object with keys subject, letter, email, usedFacts, omissions.
+usedFacts is an array of short phrases copied from the résumé.
+omissions is an array of requirements you could not support.
+When format is letter, email is an empty string. When format is email, letter is an empty string.
+When format is both, the email is shorter than the letter.
+Sign with the name on the résumé when one is present.`;
+
+function userPrompt(input: DraftInput, revision?: ModelRevision): string {
   const language = input.language === "zh-Hant" ? "Traditional Chinese (zh-Hant)" : "English";
-  return [
+  const lines = [
     `Language: ${language}`,
     `Tone: ${input.tone}`,
     `Length: ${LENGTH_GUIDE[input.length]}`,
@@ -164,7 +207,32 @@ function userPrompt(input: DraftInput): string {
     '"""',
     input.jobDescription,
     '"""',
-  ].join("\n");
+  ];
+  if (revision) {
+    lines.push(
+      "",
+      "Current subject:",
+      '"""',
+      revision.subject.slice(0, 180),
+      '"""',
+      "",
+      "Current letter:",
+      '"""',
+      revision.letter.slice(0, 8_000),
+      '"""',
+      "",
+      "Current email:",
+      '"""',
+      revision.email.slice(0, 8_000),
+      '"""',
+      "",
+      "Writer instruction (apply this, keep the rest):",
+      '"""',
+      revision.instruction.trim().slice(0, 300),
+      '"""',
+    );
+  }
+  return lines.join("\n");
 }
 
 function readChatContent(payload: unknown): string {

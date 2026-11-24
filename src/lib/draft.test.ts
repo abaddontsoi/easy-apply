@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { LIMITS, parseDraftInput, parseLetterId, parseSavedLetter } from "./draft";
+import { LIMITS, parseDraftInput, parseLetterId, parseRevision, parseSavedLetter } from "./draft";
 
 const LETTER_ID = "123e4567-e89b-42d3-a456-426614174000";
 
@@ -52,6 +52,31 @@ describe("parseDraftInput", () => {
     assert.doesNotMatch(parsed.value.resume, /\u0000/);
     assert.equal(parsed.value.company, "North Wind");
     assert.equal(parsed.value.role.length, LIMITS.field);
+  });
+});
+
+describe("parseRevision", () => {
+  it("ignores a blank instruction and rejects one that is too long", () => {
+    assert.deepEqual(parseRevision(request()), { ok: true, revision: null });
+    assert.deepEqual(parseRevision(request({ instruction: "   " })), { ok: true, revision: null });
+    const long = parseRevision(request({ instruction: "改".repeat(LIMITS.instruction + 1) }));
+    assert.equal(long.ok, false);
+    if (!long.ok) assert.match(long.error, /300/);
+    const parsed = parseRevision(
+      request({
+        instruction: "  把開頭寫短  ",
+        mode: "nope",
+        subject: "s".repeat(200),
+        letter: "現有的信",
+        email: "",
+      }),
+    );
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok || !parsed.revision) return;
+    assert.equal(parsed.revision.instruction, "把開頭寫短");
+    assert.equal(parsed.revision.mode, "structured");
+    assert.equal(parsed.revision.subject.length, 180);
+    assert.equal(parsed.revision.letter, "現有的信");
   });
 });
 

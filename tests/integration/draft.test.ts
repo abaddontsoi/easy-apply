@@ -82,4 +82,46 @@ describe("draft route", { concurrency: 1 }, () => {
     assert.equal(desk.rows.length, 8);
     assert.ok(desk.rows.every((row) => row.user_id === USER_A.id));
   });
+
+  it("keeps the submitted letter when a revise call fails", async () => {
+    configureTestEnv();
+    process.env.XAI_API_KEY = FAKE_KEY;
+    const desk = installDesk([USER_A]);
+    globalThis.fetch = (async () => new Response("no", { status: 503 })) as typeof fetch;
+    const kept = "Please keep this exact sentence about the launch calendar.";
+
+    const response = await draft(
+      jsonRequest(
+        "http://127.0.0.1/api/draft",
+        letterBody({
+          instruction: "把開頭寫短",
+          mode: "model",
+          letter: kept,
+          subject: "Kept subject",
+        }),
+      ),
+    );
+    assert.equal(response.status, 200);
+    const body = await readPayload(response);
+    assert.equal(body.mode, "model");
+    assert.equal(body.letter, kept);
+    assert.equal(body.subject, "Kept subject");
+    assert.equal(body.stored, true);
+    assert.match(String(body.notice), /這次沒有完成/);
+    assert.doesNotMatch(String(body.letter), /From the résumé/);
+    assert.equal(desk.rows.length, 1);
+    assert.equal(desk.rows[0]?.letter, kept);
+    assert.equal(desk.rows[0]?.mode, "model");
+  });
+
+  it("rejects an instruction longer than 300 characters before storing a letter", async () => {
+    configureTestEnv();
+    const desk = installDesk([USER_A]);
+    const response = await draft(
+      jsonRequest("http://127.0.0.1/api/draft", letterBody({ instruction: "改".repeat(301) })),
+    );
+    assert.equal(response.status, 400);
+    assert.match(String((await readPayload(response)).error), /300/);
+    assert.equal(desk.rows.length, 0);
+  });
 });

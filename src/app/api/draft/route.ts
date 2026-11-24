@@ -1,6 +1,6 @@
 import { composeStructured } from "@/lib/compose";
 import { resolveModelKey } from "@/lib/credentials";
-import { parseDraftInput, parseLetterId } from "@/lib/draft";
+import { parseDraftInput, parseLetterId, parseRevision, type DraftOutput, type DraftRevision } from "@/lib/draft";
 import { allowWrite } from "@/lib/guard";
 import { privateJson, readJson } from "@/lib/http";
 import { saveLetter } from "@/lib/letters";
@@ -24,6 +24,8 @@ export async function POST(request: Request) {
   if (!body.ok) return body.response;
   const parsed = parseDraftInput(body.value);
   if (!parsed.ok) return privateJson({ error: parsed.error }, 400);
+  const revision = parseRevision(body.value);
+  if (!revision.ok) return privateJson({ error: revision.error }, 400);
   const letterId = parseLetterId(
     body.value && typeof body.value === "object" ? (body.value as { letterId?: unknown }).letterId : null,
   );
@@ -34,15 +36,30 @@ export async function POST(request: Request) {
   if (!resolved.value) {
     const code = resolved.source === "none" ? "missing" : "unauthorized";
     const source = resolved.source === "user" ? "user" : "system";
-    draft = { ...draft, notice: fallbackNotice(parsed.value.provider, code, source) };
+    const notice = fallbackNotice(parsed.value.provider, code, source);
+    draft = revision.revision ? keepRevision(revision.revision, notice) : { ...draft, notice };
   } else {
     try {
-      draft = await writeWithModel(parsed.value, keys);
+      draft = await writeWithModel(
+        parsed.value,
+        keys,
+        revision.revision
+          ? {
+              instruction: revision.revision.instruction,
+              subject: revision.revision.subject,
+              letter: revision.revision.letter,
+              email: revision.revision.email,
+            }
+          : undefined,
+      );
     } catch (error) {
       if (error instanceof UnauthenticatedError) return privateJson({ error: "請先登入。" }, 401);
       const code = error instanceof ModelError ? error.code : "unavailable";
       const source = resolved.source === "user" ? "user" : "system";
-      draft = { ...composeStructured(parsed.value), notice: fallbackNotice(parsed.value.provider, code, source) };
+      const notice = fallbackNotice(parsed.value.provider, code, source);
+      draft = revision.revision
+        ? keepRevision(revision.revision, notice)
+        : { ...composeStructured(parsed.value), notice };
     }
   }
 
@@ -58,4 +75,16 @@ export async function POST(request: Request) {
     });
   }
   return privateJson({ ...draft, provider: parsed.value.provider, id: saved.id, stored: true, saveError: "" });
+}
+
+function keepRevision(revision: DraftRevision, notice: string): DraftOutput {
+  return {
+    mode: revision.mode,
+    subject: revision.subject,
+    letter: revision.letter,
+    email: revision.email,
+    usedFacts: revision.usedFacts,
+    omissions: revision.omissions,
+    notice,
+  };
 }
