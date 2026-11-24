@@ -12,14 +12,15 @@
     "start": "node scripts/load-infisical.mjs -- next start --hostname 0.0.0.0",
     "lint": "eslint",
     "test": "npm run test:unit && npm run test:integration",
-    "test:unit": "tsx --test src/lib/compose.test.ts src/lib/draft.test.ts src/lib/extract.test.ts src/lib/guard.test.ts src/lib/http.test.ts src/lib/letters.test.ts src/lib/models.test.ts src/lib/supabase-env.test.ts src/lib/supabase.test.ts && node --test scripts/load-infisical.test.mjs",
-    "test:integration": "tsx --test tests/integration/auth.test.ts tests/integration/draft.test.ts tests/integration/extract.test.ts tests/integration/letters.test.ts",
+    "test:unit": "tsx --test src/lib/compose.test.ts src/lib/draft.test.ts src/lib/extract.test.ts src/lib/guard.test.ts src/lib/http.test.ts src/lib/jobsdb.test.ts src/lib/letters.test.ts src/lib/models.test.ts src/lib/scrape-jobs.test.ts src/lib/supabase-env.test.ts src/lib/supabase.test.ts && node --test scripts/load-infisical.test.mjs",
+    "test:integration": "tsx --test tests/integration/auth.test.ts tests/integration/draft.test.ts tests/integration/extract.test.ts tests/integration/jobs.test.ts tests/integration/letters.test.ts",
     "test:e2e": "node e2e/run.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.119.2",
+    "apify-client": "^2.26.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.2",
     "lucide-react": "^1.78.0",

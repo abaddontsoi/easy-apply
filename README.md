@@ -24,8 +24,11 @@ Infisical is the only place these values are stored. The app still reads `proces
 - `SUPABASE_SECRET_KEY`
 - `XAI_API_KEY` for Grok
 - `GEMINI_API_KEY` for Gemini
+- `APIFY_TOKEN` for JobsDB search
 
-Either model key can be omitted. The missing model falls back to a labeled structured draft, which is still stored in Supabase. Keep both Supabase keys server-side. Do not prefix the secret key with `NEXT_PUBLIC_`, and do not store a legacy `anon` or `service_role` key.
+Either model key can be omitted. The missing model falls back to a labeled structured draft, which is still stored in Supabase. `APIFY_TOKEN` can be omitted too; the desk still writes letters, and JobsDB search reports that the token is missing. Keep both Supabase keys and the Apify token server-side. Do not prefix the secret key with `NEXT_PUBLIC_`, and do not store a legacy `anon` or `service_role` key.
+
+JobsDB search calls the Apify actor `websift/seek-job-scraper` through `apify-client`. Hong Kong uses `hk.jobsdb.com` (`country: hongkong`) and Thailand uses `th.jobsdb.com` (`country: thailand`). A search asks for 10 to 20 listings from the last 31 days and stops the run if it would cost more than USD 0.15. Listings stay in the browser until the user writes or saves a letter.
 
 If `SUPABASE_URL` or `SUPABASE_PUBLISHABLE_KEY` is empty, the server also reads `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. A value wrapped in one pair of quotes is accepted. The setup screen names the variable that is missing or rejected, and it never prints the value. A publishable key must start with `sb_publishable_`. A secret key must start with `sb_secret_`. The URL must be `https`, except `http://localhost` and `http://127.0.0.1`.
 
@@ -70,6 +73,6 @@ npm run test:e2e
 
 `npm test` runs unit and integration tests with `node:test` and does not launch a browser. Unit tests cover the structured drafter, draft parsing, Supabase key checks, write limits, HTTP helpers, text extraction, model response parsing, and letter mapping. Integration tests call the route handlers with an in-memory letters store. They do not contact Supabase, xAI, or Gemini.
 
-`npm run test:e2e` runs the setup spec, then the desk spec. Each spec starts its own Turbopack dev server so the two processes do not compile Google fonts at the same time. Port 4748 has Supabase unset and expects the setup screen. Port 4749 sets `COVER_DESK_E2E=1`, signs in a fixed desk user, stores letters in memory, and writes a structured draft. That flag is ignored when `NODE_ENV` is `production`. Do not set it on Railway. Install Chromium once with `npx playwright install chromium`.
+`npm run test:e2e` runs the setup spec, then the desk spec. Each spec starts its own dev server so the two processes do not compile Google fonts at the same time. The server uses webpack. Turbopack currently fails while rewriting the Noto Serif TC stylesheet. Port 4748 has Supabase unset and expects the setup screen. Port 4749 sets `COVER_DESK_E2E=1`, signs in a fixed desk user, stores letters in memory, and writes a structured draft. That flag is ignored when `NODE_ENV` is `production`. Do not set it on Railway. Install Chromium once with `npx playwright install chromium`.
 
 On Node 20.16, Tailwind's `magic-string` dependency is ESM-only and cannot be loaded with `require()`. The e2e servers set `NODE_OPTIONS` to preload `e2e/preload.cjs`, a small CommonJS stand-in used only by those processes.

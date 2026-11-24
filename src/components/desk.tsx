@@ -23,6 +23,7 @@ import {
   SAMPLE_ROLE,
 } from "@/lib/sample";
 import { cn } from "@/lib/utils";
+import { JobSearch } from "@/components/job-search";
 import { Copy, Download, FileUp, PenLine, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -337,7 +338,7 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
   return (
     <div className="min-h-screen">
       <header className="border-b border-border/80">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-6">
+        <div className="mx-auto flex max-w-[1760px] flex-col gap-4 px-4 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-6 xl:px-8">
           <div className="flex items-start gap-3">
             <div
               aria-hidden
@@ -347,9 +348,6 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
             </div>
             <div>
               <h1 className="font-serif text-3xl leading-none tracking-tight">函箋</h1>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-                履歷和職缺存在 Supabase。文稿由 Grok 或 Gemini 撰寫，只使用履歷裡寫過的事實。
-              </p>
             </div>
           </div>
           <div className="text-sm sm:text-right">
@@ -361,7 +359,7 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
         </div>
       </header>
 
-      <main className="mx-auto grid w-full min-w-0 max-w-6xl items-start gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_minmax(0,1fr)]">
+      <main className="mx-auto grid w-full min-w-0 max-w-[1760px] items-start gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_minmax(0,1fr)] xl:gap-8 xl:px-8">
         <aside className="grid min-w-0 gap-2 overflow-hidden">
           <Button type="button" variant="outline" className="w-full min-w-0 max-w-full" onClick={startNew}>
             新的一封
@@ -400,7 +398,7 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
             <CardTitle className="font-serif text-xl">材料</CardTitle>
           </CardHeader>
           <CardContent>
-            <form className="grid min-w-0 gap-4" onSubmit={onSubmit}>
+            <form className="@container grid min-w-0 gap-4" onSubmit={onSubmit}>
               <div className="grid gap-1.5">
                 <div className="flex items-center justify-between gap-3">
                   <Label htmlFor="resume">履歷</Label>
@@ -435,6 +433,15 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
                 </div>
                 {fileNote ? <p className="text-xs text-muted-foreground">{fileNote}</p> : null}
               </div>
+
+              <JobSearch
+                onPick={(job) => {
+                  setCompany(job.company.slice(0, 120));
+                  setRole(job.title.slice(0, 120));
+                  setJobDescription(job.text.slice(0, 20_000));
+                  setError("");
+                }}
+              />
 
               <div className="grid gap-1.5">
                 <div className="flex items-center justify-between gap-3">
@@ -473,7 +480,7 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
                   placeholder="知道姓名再填，否則用敬啟者"
                 />
               </div>
-              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2 @min-[36rem]:grid-cols-3">
                 <Choice label="模型" value={provider} items={providerItems} onChange={setProvider} />
                 <Choice label="語氣" value={tone} items={TONE_ITEMS} onChange={setTone} />
                 <Choice label="篇幅" value={length} items={LENGTH_ITEMS} onChange={setLength} />
@@ -521,7 +528,7 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
                   <p className="font-serif text-2xl">信會寫在這裡。</p>
                   <ol className="mt-4 grid list-decimal gap-2 pl-4 text-sm leading-6 text-muted-foreground">
                     <li>貼上履歷，或先載入虛構範例。</li>
-                    <li>貼上職缺，選擇 Grok 或 Gemini。</li>
+                    <li>貼上職缺，或從 JobsDB 搜尋，再選擇 Grok 或 Gemini。</li>
                     <li>撰寫後可以改字，再儲存、複製或下載。內容在 Supabase。</li>
                   </ol>
                 </div>
