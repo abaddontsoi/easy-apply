@@ -20,9 +20,9 @@ describe("scrapeJobsdb", () => {
   });
 
   it("uses the injected runner and does not need a token", async () => {
-    let received: Record<string, unknown> | null = null;
+    const captured: { input?: Record<string, unknown> } = {};
     setJobRunnerForTests(async (input) => {
-      received = input;
+      captured.input = input;
       return [
         {
           id: "1",
@@ -37,8 +37,8 @@ describe("scrapeJobsdb", () => {
     const jobs = await scrapeJobsdb(query);
     assert.equal(jobs.length, 1);
     assert.equal(jobs[0]?.title, "Platform Engineer");
-    assert.equal(received?.country, "hongkong");
-    assert.equal(received?.searchTerm, "software engineer");
+    assert.equal(captured.input?.country, "hongkong");
+    assert.equal(captured.input?.searchTerm, "software engineer");
   });
 
   it("stops before Apify when APIFY_TOKEN is missing", async () => {
