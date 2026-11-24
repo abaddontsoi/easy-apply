@@ -20,6 +20,7 @@ test("writes a structured draft on the signed-in desk", async ({ page }) => {
   await page.getByRole("button", { name: "撰寫並儲存" }).click();
   await expect(page.getByText("結構草稿", { exact: true })).toBeVisible();
   await expect(page.getByText("尚未連接 Grok")).toBeVisible();
+  await expect(page.getByRole("button", { name: "按指示改寫" })).toBeDisabled();
 
   const letter = page.locator("#letter");
   await expect(letter).toContainText("1,200 teams");

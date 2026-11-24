@@ -2,7 +2,7 @@
 
 A writing desk for cover letters and application emails. A résumé and a target job description become a letter, an email, or both. The prose uses only facts from the résumé. Requirements the résumé does not support are listed beside the draft.
 
-The interface is Traditional Chinese. The letter can be English or Traditional Chinese. Grok (`grok-4.7` on the xAI API) or Gemini (`gemini-3.5-flash-lite`) writes the prose. With neither key set, the app still saves a structured draft built from the résumé and labels it as such.
+The interface is Traditional Chinese. The letter can be English or Traditional Chinese. Grok (`grok-4.7` on the xAI API) or Gemini (`gemini-3.5-flash-lite`) writes the prose. With neither key set, the app still saves a structured draft built from the résumé and labels it as such. The model call, the empty-reply retry, and a revise-by-instruction pass are specified in [docs/email-generation.md](docs/email-generation.md).
 
 Accounts, résumés, job descriptions, and letters live in Supabase. Nothing is kept in the browser.
 

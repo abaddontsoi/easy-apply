@@ -15,6 +15,7 @@ export const LIMITS = {
   job: 20_000,
   field: 120,
   minText: 40,
+  instruction: 300,
 } as const;
 
 export type DraftInput = {
@@ -31,6 +32,17 @@ export type DraftInput = {
 };
 
 export type DraftMode = "model" | "structured";
+
+/** A revise pass. Absent when the request is a first write. */
+export type DraftRevision = {
+  instruction: string;
+  subject: string;
+  letter: string;
+  email: string;
+  mode: DraftMode;
+  usedFacts: string[];
+  omissions: string[];
+};
 
 export type DraftOutput = {
   mode: DraftMode;
@@ -99,6 +111,38 @@ export function parseDraftInput(
       language: language as Language,
       format: format as Format,
       provider: provider as Provider,
+    },
+  };
+}
+
+/**
+ * Optional revise instruction on POST /api/draft.
+ * A missing or blank instruction means a first write, and the prose fields are ignored.
+ */
+export function parseRevision(
+  body: unknown,
+): { ok: true; revision: DraftRevision | null } | { ok: false; error: string } {
+  if (!body || typeof body !== "object") return { ok: true, revision: null };
+  const record = body as Record<string, unknown>;
+  if (!("instruction" in record) || record.instruction == null) return { ok: true, revision: null };
+  if (typeof record.instruction !== "string") {
+    return { ok: false, error: "修改指示請用文字。" };
+  }
+  const instruction = record.instruction.replace(/\u0000/g, "").trim();
+  if (!instruction) return { ok: true, revision: null };
+  if (instruction.length > LIMITS.instruction) {
+    return { ok: false, error: "修改指示請保持在 300 字以內。" };
+  }
+  return {
+    ok: true,
+    revision: {
+      instruction,
+      subject: asText(record.subject).slice(0, 180),
+      letter: asText(record.letter).slice(0, 8_000),
+      email: asText(record.email).slice(0, 8_000),
+      mode: record.mode === "model" ? "model" : "structured",
+      usedFacts: clipList(record.usedFacts),
+      omissions: clipList(record.omissions),
     },
   };
 }
