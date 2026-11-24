@@ -1,5 +1,3 @@
-import { JOBSDB_ACTOR_DEFAULTS } from "@/lib/jobsdb-actor-input";
-
 export const JOBSDB_ACTOR = "websift/seek-job-scraper";
 export const JOBSDB_MIN_RESULTS = 10;
 export const JOBSDB_MAX_RESULTS = 20;
@@ -76,13 +74,21 @@ export function parseJobQuery(
   };
 }
 
-export function actorInput(query: JobQuery): Record<string, string | number | boolean> {
-  return {
-    ...JOBSDB_ACTOR_DEFAULTS,
+export function actorInput(query: JobQuery): Record<string, string | number | boolean | string[]> {
+  const input: Record<string, string | number | boolean | string[]> = {
     searchTerm: query.keyword,
     country: query.country,
     maxResults: query.maxResults,
+    requireEmail: false,
+    requirePhone: false,
+    requireEmailPhone: false,
+    includeOneInTitle: [],
+    workTypes: [],
+    workArrangements: [],
+    subclassifications: false,
   };
+  if (query.location) input.location = query.location;
+  return input;
 }
 
 export function normalizeJobs(items: unknown[]): ScrapedJob[] {

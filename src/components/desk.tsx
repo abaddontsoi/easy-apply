@@ -25,6 +25,7 @@ import {
 import { cn } from "@/lib/utils";
 import { JobSearch } from "@/components/job-search";
 import { Copy, Download, FileUp, PenLine, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -84,7 +85,15 @@ const hongKongTime = new Intl.DateTimeFormat("zh-Hant-HK", {
   minute: "2-digit",
 });
 
-export function Desk({ email, providers }: { email: string; providers: ProviderStatus }) {
+export function Desk({
+  email,
+  providers,
+  keyWarning = "",
+}: {
+  email: string;
+  providers: ProviderStatus;
+  keyWarning?: string;
+}) {
   const router = useRouter();
   const [resume, setResume] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -352,9 +361,16 @@ export function Desk({ email, providers }: { email: string; providers: ProviderS
           </div>
           <div className="text-sm sm:text-right">
             <p className="font-medium">{email}</p>
-            <button type="button" className="text-muted-foreground underline-offset-4 hover:underline" onClick={() => void logout()}>
-              登出
-            </button>
+            <p className="text-muted-foreground">
+              <Link href="/settings" className="underline-offset-4 hover:underline">
+                設定
+              </Link>
+              <span aria-hidden> · </span>
+              <button type="button" className="underline-offset-4 hover:underline" onClick={() => void logout()}>
+                登出
+              </button>
+            </p>
+            {keyWarning ? <p className="mt-1 text-xs text-destructive">{keyWarning}</p> : null}
           </div>
         </div>
       </header>

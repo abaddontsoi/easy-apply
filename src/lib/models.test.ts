@@ -27,6 +27,7 @@ describe("model helpers", { concurrency: 1 }, () => {
     process.env.GEMINI_API_KEY = FAKE_KEY;
     assert.equal(providerReady("grok"), false);
     assert.equal(providerReady("gemini"), true);
+    assert.equal(providerStatus({ grok: "user-owned-key", gemini: "" }).grok, true);
   });
 
   it("describes a missing key, a rejected key, and an unavailable model", () => {
@@ -62,6 +63,23 @@ describe("model helpers", { concurrency: 1 }, () => {
     assert.equal(bearerMatches(calls[0]?.init), true);
     const body = JSON.parse(String(calls[0]?.init.body)) as { model?: string };
     assert.equal(body.model, "grok-4.7");
+  });
+
+  it("sends the saved Grok key and leaves the system key unused", async () => {
+    rememberKeys();
+    process.env.XAI_API_KEY = "system-key-unused";
+    const calls = stubFetch(
+      chat({
+        subject: "Hello",
+        letter: "Letter body.",
+        email: "",
+        usedFacts: ["fact"],
+        omissions: [],
+      }),
+    );
+    await writeWithModel(input({ format: "letter" }), { grok: "user-owned-key", gemini: "" });
+    assert.equal(new Headers(calls[0]?.init.headers).get("authorization"), "Bearer user-owned-key");
+    assert.equal(fallbackNotice("grok", "unauthorized", "user").includes("設定頁"), true);
   });
 
   it("reads Gemini text and skips thought parts", async () => {

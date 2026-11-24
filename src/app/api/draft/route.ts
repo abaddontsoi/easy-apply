@@ -1,10 +1,12 @@
 import { composeStructured } from "@/lib/compose";
+import { resolveModelKey } from "@/lib/credentials";
 import { parseDraftInput, parseLetterId } from "@/lib/draft";
 import { allowWrite } from "@/lib/guard";
 import { privateJson, readJson } from "@/lib/http";
 import { saveLetter } from "@/lib/letters";
-import { ModelError, fallbackNotice, providerReady, writeWithModel } from "@/lib/models";
+import { ModelError, fallbackNotice, writeWithModel } from "@/lib/models";
 import { requireUser } from "@/lib/session";
+import { keysForRequest } from "@/lib/user-keys";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +14,8 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const session = await requireUser();
   if (session instanceof Response) return session;
+  const keys = await keysForRequest(session);
+  if (keys instanceof Response) return keys;
   if (!allowWrite(session.userId)) {
     return privateJson({ error: "這十分鐘已經寫了八次，請稍後再寫。" }, 429);
   }
@@ -26,14 +30,18 @@ export async function POST(request: Request) {
   if (!letterId.ok) return privateJson({ error: letterId.error }, 400);
 
   let draft = composeStructured(parsed.value);
-  if (!providerReady(parsed.value.provider)) {
-    draft = { ...draft, notice: fallbackNotice(parsed.value.provider, "missing") };
+  const resolved = resolveModelKey(parsed.value.provider, keys);
+  if (!resolved.value) {
+    const code = resolved.source === "none" ? "missing" : "unauthorized";
+    const source = resolved.source === "user" ? "user" : "system";
+    draft = { ...draft, notice: fallbackNotice(parsed.value.provider, code, source) };
   } else {
     try {
-      draft = await writeWithModel(parsed.value);
+      draft = await writeWithModel(parsed.value, keys);
     } catch (error) {
       const code = error instanceof ModelError ? error.code : "unavailable";
-      draft = { ...composeStructured(parsed.value), notice: fallbackNotice(parsed.value.provider, code) };
+      const source = resolved.source === "user" ? "user" : "system";
+      draft = { ...composeStructured(parsed.value), notice: fallbackNotice(parsed.value.provider, code, source) };
     }
   }
 

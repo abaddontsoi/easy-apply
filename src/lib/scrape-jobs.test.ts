@@ -49,4 +49,13 @@ describe("scrapeJobsdb", () => {
       (error: unknown) => error instanceof JobsError && error.code === "missing_token",
     );
   });
+
+  it("does not use the system token when the stored token cannot be used", async () => {
+    process.env.APIFY_TOKEN = "system-token-ok";
+    setJobRunnerForTests(null);
+    await assert.rejects(
+      () => scrapeJobsdb(query, "bad token"),
+      (error: unknown) => error instanceof JobsError && error.code === "missing_token",
+    );
+  });
 });

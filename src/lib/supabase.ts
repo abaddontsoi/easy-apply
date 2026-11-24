@@ -38,6 +38,7 @@ type AuthClient = NonNullable<Awaited<ReturnType<typeof openAuthClient>>>;
 let authFactory: (() => Promise<SupabaseAuthDouble | null>) | null = null;
 let dataFactory: (() => SupabaseClient | null) | null = null;
 let e2eLetters: MemoryLetter[] | null = null;
+let e2eSecrets: MemoryLetter[] | null = null;
 
 export function supabaseConfigured(): boolean {
   if (e2eDeskEnabled()) return true;
@@ -156,5 +157,6 @@ function e2eAuthClient(): SupabaseAuthDouble {
 
 function e2eDataClient(): SupabaseClient {
   e2eLetters ??= [];
-  return createMemoryDataClient(e2eLetters) as unknown as SupabaseClient;
+  e2eSecrets ??= [];
+  return createMemoryDataClient(e2eLetters, { secrets: e2eSecrets }) as unknown as SupabaseClient;
 }
