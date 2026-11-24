@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it, mock } from "node:test";
-import { allowWrite, resetWritesForTests } from "./guard";
+import { allowScrape, allowWrite, resetWritesForTests } from "./guard";
 
 describe("allowWrite", { concurrency: 1 }, () => {
   afterEach(() => {
@@ -24,5 +24,17 @@ describe("allowWrite", { concurrency: 1 }, () => {
     } finally {
       mock.timers.reset();
     }
+  });
+});
+
+describe("allowScrape", { concurrency: 1 }, () => {
+  afterEach(() => {
+    resetWritesForTests();
+  });
+
+  it("allows three JobsDB searches for one viewer and still allows another", () => {
+    for (let count = 0; count < 3; count += 1) assert.equal(allowScrape("viewer-a"), true);
+    assert.equal(allowScrape("viewer-a"), false);
+    assert.equal(allowScrape("viewer-b"), true);
   });
 });
