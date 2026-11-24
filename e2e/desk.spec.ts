@@ -6,7 +6,7 @@ test("writes a structured draft on the signed-in desk", async ({ page }) => {
   await expect(page.getByText("writer@example.com")).toBeVisible();
   await expect(page.getByText("存進 Supabase 的信會列在這裡。")).toBeVisible();
 
-  await page.getByRole("link", { name: "設定" }).click();
+  await page.getByRole("navigation", { name: "主要" }).getByRole("link", { name: "設定", exact: true }).click();
   await page.getByRole("button", { name: "載入範例" }).click();
   await expect(page.getByLabel("履歷文字")).toContainText("Chloe Chan");
   await expect(page.getByText("範例文字會存進 Supabase")).toBeVisible();
