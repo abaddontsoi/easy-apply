@@ -13,12 +13,14 @@ type QueryResult = {
 
 export function createMemoryDataClient(
   rows: MemoryLetter[],
-  options?: { errorCode?: string; secrets?: MemoryLetter[]; secretsError?: string },
+  options?: { errorCode?: string; secrets?: MemoryLetter[]; secretsError?: string; resumes?: MemoryLetter[]; resumesError?: string },
 ) {
   const secrets = options?.secrets ?? [];
+  const resumes = options?.resumes ?? [];
   return {
     from(table: string) {
       if (table === "user_secrets") return new LetterQuery(secrets, options?.secretsError);
+      if (table === "resumes") return new LetterQuery(options?.resumes ?? resumes, options?.resumesError);
       const errorCode = table === "letters" ? options?.errorCode : "42P01";
       return new LetterQuery(rows, errorCode);
     },

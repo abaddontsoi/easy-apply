@@ -1,5 +1,7 @@
 "use client";
 
+import { AppShell } from "@/components/app-shell";
+import { clearSelectedJob, peekSelectedJob } from "@/lib/selected-job";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,15 +18,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import type { DraftMode, DraftOutput, Format, Language, Length, Provider, Tone } from "@/lib/draft";
 import type { ProviderStatus } from "@/lib/models";
-import {
-  SAMPLE_COMPANY,
-  SAMPLE_JOB,
-  SAMPLE_RESUME,
-  SAMPLE_ROLE,
-} from "@/lib/sample";
+import { SAMPLE_COMPANY, SAMPLE_JOB, SAMPLE_ROLE } from "@/lib/sample";
 import { cn } from "@/lib/utils";
-import { JobSearch } from "@/components/job-search";
-import { Copy, Download, FileUp, PenLine, Trash2 } from "lucide-react";
+import { Copy, Download, PenLine, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -109,8 +105,7 @@ export function Desk({
   const [letterId, setLetterId] = useState<string | null>(null);
   const [letters, setLetters] = useState<Summary[]>([]);
   const [listError, setListError] = useState("");
-  const [reading, setReading] = useState(false);
-  const [fileNote, setFileNote] = useState("");
+  const [storedFile, setStoredFile] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -120,7 +115,6 @@ export function Desk({
   const [subject, setSubject] = useState("");
   const [pane, setPane] = useState<Pane>("letter");
   const [copied, setCopied] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   const resultRef = useRef<HTMLElement>(null);
 
   const providerItems: Record<Provider, string> = {
@@ -130,6 +124,38 @@ export function Desk({
 
   useEffect(() => {
     void loadList(setLetters, setListError);
+  }, []);
+
+  useEffect(() => {
+    let cancel = false;
+    void (async () => {
+      const response = await fetch("/api/resume");
+      const body: unknown = await response.json().catch(() => null);
+      if (cancel || !response.ok || !body || typeof body !== "object") return;
+      const stored = (body as { resume?: unknown }).resume;
+      if (!isResumeView(stored)) return;
+      setResume(stored.text);
+      setStoredFile(stored.hasFile ? stored.filename : "");
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const selected = peekSelectedJob();
+    if (!selected) return;
+    setLetterId(null);
+    setJobDescription(selected.text);
+    setCompany(selected.company);
+    setRole(selected.role);
+    setHiringManager("");
+    setResult(null);
+    setLetter("");
+    setEmailBody("");
+    setSubject("");
+    setError("");
+    queueMicrotask(() => clearSelectedJob());
   }, []);
 
   useEffect(() => {
@@ -237,7 +263,6 @@ export function Desk({
       return;
     }
     setLetterId(stored.id);
-    setResume(stored.resume);
     setJobDescription(stored.jobDescription);
     setCompany(stored.company);
     setRole(stored.role);
@@ -280,8 +305,8 @@ export function Desk({
   }
 
   function startNew() {
+    clearSelectedJob();
     setLetterId(null);
-    setResume("");
     setJobDescription("");
     setCompany("");
     setRole("");
@@ -290,53 +315,17 @@ export function Desk({
     setLetter("");
     setEmailBody("");
     setSubject("");
-    setFileNote("");
     setError("");
   }
 
   function loadSample() {
-    setResume(SAMPLE_RESUME);
     setJobDescription(SAMPLE_JOB);
     setCompany(SAMPLE_COMPANY);
     setRole(SAMPLE_ROLE);
     setHiringManager("");
     setLanguage("en");
     setFormat("both");
-    setFileNote("已載入虛構範例。Chloe Chan 不是真人。按下儲存或撰寫才會寫進 Supabase。");
     setError("");
-  }
-
-  async function onFile(file: File | undefined) {
-    if (!file) return;
-    setFileNote("");
-    setReading(true);
-    try {
-      const body = new FormData();
-      body.set("file", file);
-      const response = await fetch("/api/extract", { method: "POST", body });
-      const payload: unknown = await response.json().catch(() => null);
-      if (!response.ok) {
-        setFileNote(readError(payload) ?? "讀不到這個檔案。");
-        return;
-      }
-      if (!payload || typeof payload !== "object" || typeof (payload as { text?: unknown }).text !== "string") {
-        setFileNote("讀不到這個檔案。");
-        return;
-      }
-      const extracted = payload as { text: string; truncated?: boolean };
-      setResume(extracted.text);
-      setFileNote(extracted.truncated ? "檔案較長，已放入前 20,000 字。" : `已讀入 ${file.name}`);
-    } catch {
-      setFileNote("讀不到這個檔案。請改貼履歷。");
-    } finally {
-      setReading(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
-
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.refresh();
   }
 
   const showLetter = Boolean(letter);
@@ -345,38 +334,11 @@ export function Desk({
   const activeText = activePane === "email" ? emailWithSubject(subject, emailBody, language) : letter;
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden">
-      <header className="shrink-0 border-b border-border/80">
-        <div className="flex w-full flex-col gap-3 px-4 py-3 sm:flex-row sm:items-end sm:justify-between sm:px-5">
-          <div className="flex items-start gap-3">
-            <div
-              aria-hidden
-              className="grid size-11 shrink-0 place-items-center rounded-md bg-primary font-serif text-xl text-primary-foreground"
-            >
-              函
-            </div>
-            <div>
-              <h1 className="font-serif text-3xl leading-none tracking-tight">函箋</h1>
-            </div>
-          </div>
-          <div className="text-sm sm:text-right">
-            <p className="font-medium">{email}</p>
-            <p className="text-muted-foreground">
-              <Link href="/settings" className="underline-offset-4 hover:underline">
-                設定
-              </Link>
-              <span aria-hidden> · </span>
-              <button type="button" className="underline-offset-4 hover:underline" onClick={() => void logout()}>
-                登出
-              </button>
-            </p>
-            {keyWarning ? <p className="mt-1 text-xs text-destructive">{keyWarning}</p> : null}
-          </div>
-        </div>
-      </header>
-
-      <main className="grid min-h-0 w-full flex-1 items-stretch gap-4 overflow-y-auto px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_minmax(0,1fr)] lg:overflow-hidden">
-        <aside className="grid min-h-0 min-w-0 content-start gap-2 overflow-hidden lg:overflow-y-auto">
+    <AppShell
+      email={email}
+      note={keyWarning}
+      sidebar={
+        <div className="grid content-start gap-2 pb-3">
           <Button type="button" variant="outline" className="w-full min-w-0 max-w-full" onClick={startNew}>
             新的一封
           </Button>
@@ -407,8 +369,11 @@ export function Desk({
               </li>
             ))}
           </ul>
-        </aside>
-
+        </div>
+      }
+    >
+      <h1 className="shrink-0 px-4 pt-4 font-serif text-2xl leading-none sm:px-5">寫作新信件</h1>
+      <main className="grid min-h-0 w-full flex-1 items-stretch gap-4 overflow-y-auto px-4 py-4 sm:px-5 lg:grid-cols-2 lg:overflow-hidden">
         <Card className="h-full min-h-0 min-w-0 lg:overflow-y-auto">
           <CardHeader>
             <CardTitle className="font-serif text-xl">材料</CardTitle>
@@ -417,53 +382,34 @@ export function Desk({
             <form className="@container grid min-w-0 gap-4" onSubmit={onSubmit}>
               <div className="grid gap-1.5">
                 <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="resume">履歷</Label>
-                  <span className={counterClass(resume.length)}>{resume.length.toLocaleString("zh-Hant")} / 20,000</span>
+                  <p className="text-sm font-medium">履歷</p>
+                  <Link href="/settings" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
+                    在設定頁修改
+                  </Link>
                 </div>
-                <Textarea
-                  id="resume"
-                  value={resume}
-                  maxLength={20000}
-                  onChange={(event) => setResume(event.target.value)}
-                  placeholder="貼上履歷，或上傳 PDF、Word、純文字。"
-                  className="field-sizing-fixed min-h-52 w-full max-w-full resize-y"
-                />
-                <div className="flex flex-wrap gap-2">
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept=".pdf,.docx,.txt,.md,application/pdf,text/plain"
-                    className="sr-only"
-                    onChange={(event) => void onFile(event.target.files?.[0])}
-                  />
-                  <Button type="button" variant="outline" disabled={reading} onClick={() => fileRef.current?.click()}>
-                    <FileUp />
-                    {reading ? "讀取中" : "上傳履歷"}
-                  </Button>
-                  <Button type="button" variant="outline" onClick={loadSample}>
-                    載入範例
-                  </Button>
-                  <Button type="button" variant="ghost" onClick={startNew}>
-                    清除
-                  </Button>
-                </div>
-                {fileNote ? <p className="text-xs text-muted-foreground">{fileNote}</p> : null}
+                {resume ? (
+                  <p className="line-clamp-6 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{resume}</p>
+                ) : (
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    尚未儲存履歷。到設定頁貼上或上傳，撰寫時會使用那一份。
+                  </p>
+                )}
+                {storedFile ? <p className="text-xs text-muted-foreground">已儲存 {storedFile}</p> : null}
               </div>
-
-              <JobSearch
-                onPick={(job) => {
-                  setCompany(job.company.slice(0, 120));
-                  setRole(job.title.slice(0, 120));
-                  setJobDescription(job.text.slice(0, 20_000));
-                  setError("");
-                }}
-              />
 
               <div className="grid gap-1.5">
                 <div className="flex items-center justify-between gap-3">
                   <Label htmlFor="job">職缺說明</Label>
-                  <span className={counterClass(jobDescription.length)}>
-                    {jobDescription.length.toLocaleString("zh-Hant")} / 20,000
+                  <span className="flex flex-wrap items-center justify-end gap-3">
+                    <Link href="/jobs" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
+                      從 JobsDB 搜尋
+                    </Link>
+                    <span className={counterClass(jobDescription.length)}>
+                      {jobDescription.length.toLocaleString("zh-Hant")} / 20,000
+                    </span>
+                    <Button type="button" variant="outline" onClick={loadSample}>
+                      載入範例
+                    </Button>
                   </span>
                 </div>
                 <Textarea
@@ -543,8 +489,8 @@ export function Desk({
                 <div className="letter-sheet rounded-lg px-5 py-8">
                   <p className="font-serif text-2xl">信會寫在這裡。</p>
                   <ol className="mt-4 grid list-decimal gap-2 pl-4 text-sm leading-6 text-muted-foreground">
-                    <li>貼上履歷，或先載入虛構範例。</li>
-                    <li>貼上職缺，或從 JobsDB 搜尋，再選擇 Grok 或 Gemini。</li>
+                    <li>到設定頁儲存履歷，或先載入虛構職缺範例。</li>
+                    <li>到搜尋職缺選定一筆，或在這裡貼上職缺說明。</li>
                     <li>撰寫後可以改字，再儲存、複製或下載。內容在 Supabase。</li>
                   </ol>
                 </div>
@@ -621,7 +567,7 @@ export function Desk({
           </Card>
         </section>
       </main>
-    </div>
+    </AppShell>
   );
 }
 
@@ -701,6 +647,22 @@ function Choice<T extends string>({
         </SelectContent>
       </Select>
     </div>
+  );
+}
+
+function isResumeView(value: unknown): value is {
+  filename: string;
+  text: string;
+  truncated: boolean;
+  hasFile: boolean;
+} {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.filename === "string" &&
+    typeof record.text === "string" &&
+    typeof record.truncated === "boolean" &&
+    typeof record.hasFile === "boolean"
   );
 }
 
