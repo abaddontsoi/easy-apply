@@ -9,11 +9,13 @@ Accounts, résumés, job descriptions, and letters live in Supabase. Nothing is 
 ## Supabase
 
 1. Create a project.
-2. In the SQL editor, run `supabase/migrations/0001_letters.sql`, then `supabase/migrations/0002_lock_letters.sql`, then `supabase/migrations/0003_user_secrets.sql`.
+2. In the SQL editor, run `supabase/migrations/0001_letters.sql`, then `supabase/migrations/0002_lock_letters.sql`, then `supabase/migrations/0003_user_secrets.sql`, then `supabase/migrations/0004_resumes.sql`.
 3. Enable email sign-in. Set the Site URL to the Railway URL.
 4. In Settings → API Keys, open Publishable and secret keys. Create the publishable key and a secret key used only by this app. Disable the legacy `anon` and `service_role` keys. Do not copy a key that starts with `eyJ`.
 
-The browser never talks to Supabase. The server uses the publishable key for sign-in and session refresh, and the secret key for `letters`. The migrations grant that table only to `service_role` and leave row level security on with no policies, so a publishable key cannot read or write rows. The secret key bypasses row level security, and every query is limited to the signed-in user.
+The browser never talks to Supabase. The server uses the publishable key for sign-in and session refresh, and the secret key for `letters`, `user_secrets`, and `resumes`. The migrations grant those tables only to `service_role` and leave row level security on with no policies, so a publishable key cannot read or write rows. The secret key bypasses row level security, and every query is limited to the signed-in user.
+
+Each account has one résumé, edited on the settings page. Uploading a PDF, Word, or text file stores the original file and the extracted text. Saving the text keeps that wording for the desk. The original file is downloaded only by that signed-in user. A letter still keeps its own copy of the résumé text from the moment it was written.
 
 ## Secrets
 
@@ -30,7 +32,7 @@ Either model key can be omitted. The missing model falls back to a labeled struc
 
 A signed-in user can save their own Grok, Gemini, and Apify keys on the settings page. Those values live in `user_secrets`, locked the same way as `letters`. The browser receives only a mask of the last four characters. When a personal key is saved, writing and JobsDB search use that key and do not fall back to the Infisical value. Clearing it returns that provider to the system key. Grok, Gemini, and Apify are contacted only after the signed-in session authenticates successfully.
 
-JobsDB search calls the Apify actor `websift/seek-job-scraper` through `apify-client`. Hong Kong uses `hk.jobsdb.com` (`country: hongkong`) and Thailand uses `th.jobsdb.com` (`country: thailand`). The run uses the actor's filter fields. Contact filters stay `false`. Work type, work arrangement, and classification filters are left empty, so the actor keeps every option enabled. Salary, date, radius, and `searchUrl` are omitted unless a value is set. A search asks for 10 to 20 listings and stops the run if it would cost more than USD 0.15. Listings stay in the browser until the user writes or saves a letter.
+JobsDB search calls the Apify actor `websift/seek-job-scraper` through `apify-client`. Hong Kong uses `hk.jobsdb.com` (`country: hongkong`) and Thailand uses `th.jobsdb.com` (`country: thailand`). The run uses the actor's filter fields. Contact filters stay `false`. Work type, work arrangement, and classification filters are left empty, so the actor keeps every option enabled. Salary, date, radius, and `searchUrl` are omitted unless a value is set. A search asks for 10 to 20 listings and stops the run if it would cost more than USD 0.15. Search lives on its own page. Choosing a listing opens a new letter with that company, role, and description.
 
 If `SUPABASE_URL` or `SUPABASE_PUBLISHABLE_KEY` is empty, the server also reads `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. A value wrapped in one pair of quotes is accepted. The setup screen names the variable that is missing or rejected, and it never prints the value. A publishable key must start with `sb_publishable_`. A secret key must start with `sb_secret_`. The URL must be `https`, except `http://localhost` and `http://127.0.0.1`.
 

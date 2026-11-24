@@ -1,5 +1,6 @@
 import { ExtractError, extractDocument } from "@/lib/extract";
 import { privateJson } from "@/lib/http";
+import { resumeFilename, resumeMediaType, saveResumeFile } from "@/lib/resumes";
 import { requireUser } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -23,7 +24,27 @@ export async function POST(request: Request) {
 
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    return privateJson(await extractDocument(file.name, bytes));
+    const extracted = await extractDocument(file.name, bytes);
+    const filename = resumeFilename(file.name);
+    const saved = await saveResumeFile(session, {
+      filename,
+      mediaType: resumeMediaType(filename),
+      bytes,
+      text: extracted.text,
+      truncated: extracted.truncated,
+    });
+    if (saved instanceof Response) {
+      const failure = (await saved.json().catch(() => null)) as { error?: unknown } | null;
+      const saveError = failure && typeof failure.error === "string" ? failure.error : "履歷沒有存進 Supabase。";
+      return privateJson({ ...extracted, filename, hasFile: false, saveError });
+    }
+    return privateJson({
+      text: saved.text,
+      truncated: saved.truncated,
+      filename: saved.filename,
+      hasFile: saved.hasFile,
+      saveError: "",
+    });
   } catch (error) {
     if (error instanceof ExtractError) {
       return privateJson({ error: error.message }, error.status);

@@ -11,10 +11,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { JOBSDB_COUNTRIES, type JobsdbCountry, type ListedJob } from "@/lib/jobsdb";
+import { storeSelectedJob } from "@/lib/selected-job";
 import { Search } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function JobSearch({ onPick }: { onPick: (job: ListedJob) => void }) {
+export function JobSearch() {
+  const router = useRouter();
   const [keyword, setKeyword] = useState("");
   const [country, setCountry] = useState<JobsdbCountry>("hongkong");
   const [jobs, setJobs] = useState<ListedJob[]>([]);
@@ -45,7 +48,7 @@ export function JobSearch({ onPick }: { onPick: (job: ListedJob) => void }) {
       }
       const next = readJobs(payload);
       setJobs(next);
-      setMessage(next.length === 0 ? "這組條件沒有職缺。可以放寬關鍵字。" : `找到 ${next.length} 筆。點一筆放入職缺說明。`);
+      setMessage(next.length === 0 ? "這組條件沒有職缺。可以放寬關鍵字。" : `找到 ${next.length} 筆。點一筆，前往寫作新信件。`);
     } catch {
       setJobs([]);
       setError("JobsDB 這次沒有完成。請稍後再搜。");
@@ -95,7 +98,7 @@ export function JobSearch({ onPick }: { onPick: (job: ListedJob) => void }) {
         </Button>
       </div>
       <p className="text-xs leading-5 text-muted-foreground">
-        每次 10 筆，大約要一兩分鐘，並使用你的 Apify 額度。結果留在這一頁，按下撰寫才寫進 Supabase。
+        每次 10 筆，大約要一兩分鐘，並使用你的 Apify 額度。選定後會開啟一封新信。
       </p>
       {error ? (
         <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -104,13 +107,16 @@ export function JobSearch({ onPick }: { onPick: (job: ListedJob) => void }) {
       ) : null}
       {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
       {jobs.length > 0 ? (
-        <ul className="grid max-h-64 gap-1 overflow-y-auto">
+        <ul className="grid gap-1">
           {jobs.map((job) => (
             <li key={job.id}>
               <button
                 type="button"
                 className="w-full rounded-lg px-2 py-1.5 text-left text-sm hover:bg-background"
-                onClick={() => onPick(job)}
+                onClick={() => {
+                  storeSelectedJob({ company: job.company, role: job.title, text: job.text });
+                  router.push("/");
+                }}
               >
                 <span className="block truncate font-medium">{job.title}</span>
                 <span className="block truncate text-xs text-muted-foreground">

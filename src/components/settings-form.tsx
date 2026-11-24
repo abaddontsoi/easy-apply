@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { KeySource, SettingsView } from "@/lib/credentials";
-import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
 const FIELDS = [
@@ -16,11 +15,9 @@ const FIELDS = [
 type FieldId = (typeof FIELDS)[number]["id"];
 
 export function SettingsForm({
-  email,
   initial,
   warning,
 }: {
-  email: string;
   initial: SettingsView;
   warning: string;
 }) {
@@ -72,23 +69,14 @@ export function SettingsForm({
   }
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-border/80">
-        <div className="mx-auto flex max-w-xl items-end justify-between gap-4 px-4 py-5">
-          <div>
-            <h1 className="font-serif text-3xl leading-none tracking-tight">設定</h1>
-            <p className="mt-2 text-sm text-muted-foreground">{email}</p>
-          </div>
-          <Link href="/" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-            回到函箋
-          </Link>
-        </div>
-      </header>
-      <main className="mx-auto grid max-w-xl gap-4 px-4 py-6">
-        <p className="text-sm leading-6 text-muted-foreground">
+    <section className="grid gap-4">
+      <div>
+        <h2 className="font-serif text-2xl">金鑰</h2>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
           金鑰只存在 Supabase，這一頁只顯示末四碼。某個欄位有你的金鑰時，撰寫或搜尋就用它，不再用系統金鑰。
         </p>
-        <form className="grid gap-5 rounded-xl bg-card p-5 ring-1 ring-foreground/10" onSubmit={onSubmit}>
+      </div>
+      <form className="grid gap-5 rounded-xl bg-card p-5 ring-1 ring-foreground/10" onSubmit={onSubmit}>
           {FIELDS.map((field) => {
             const fieldStatus = status[field.id];
             return (
@@ -129,9 +117,8 @@ export function SettingsForm({
           <Button type="submit" disabled={pending !== ""}>
             {pending === "save" ? "儲存中" : "儲存金鑰"}
           </Button>
-        </form>
-      </main>
-    </div>
+      </form>
+    </section>
   );
 }
 
