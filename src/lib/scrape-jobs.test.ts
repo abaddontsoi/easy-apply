@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { afterEach, describe, it } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import { JobsError } from "./jobsdb";
 import { scrapeJobsdb, setJobRunnerForTests } from "./scrape-jobs";
+import { UnauthenticatedError } from "./session";
+import { allowServiceUserForTests, setSupabaseTestDoubles } from "./supabase";
 
 const query = {
   country: "hongkong" as const,
@@ -13,7 +15,12 @@ const query = {
 const savedToken = process.env.APIFY_TOKEN;
 
 describe("scrapeJobsdb", () => {
+  beforeEach(() => {
+    allowServiceUserForTests();
+  });
+
   afterEach(() => {
+    setSupabaseTestDoubles(null);
     setJobRunnerForTests(null);
     if (savedToken === undefined) delete process.env.APIFY_TOKEN;
     else process.env.APIFY_TOKEN = savedToken;
@@ -39,6 +46,18 @@ describe("scrapeJobsdb", () => {
     assert.equal(jobs[0]?.title, "Platform Engineer");
     assert.equal(captured.input?.country, "hongkong");
     assert.equal(captured.input?.searchTerm, "software engineer");
+  });
+
+  it("does not call Apify when authentication fails", async () => {
+    setSupabaseTestDoubles(null);
+    process.env.APIFY_TOKEN = "system-token-ok";
+    let called = false;
+    setJobRunnerForTests(async () => {
+      called = true;
+      return [];
+    });
+    await assert.rejects(() => scrapeJobsdb(query), (error: unknown) => error instanceof UnauthenticatedError);
+    assert.equal(called, false);
   });
 
   it("stops before Apify when APIFY_TOKEN is missing", async () => {

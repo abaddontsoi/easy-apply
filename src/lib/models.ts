@@ -1,6 +1,7 @@
 import { composeStructured } from "@/lib/compose";
 import { EMPTY_KEYS, resolveModelKey, type KeySource, type ModelKeys } from "@/lib/credentials";
 import type { DraftInput, DraftOutput, Length, Provider } from "@/lib/draft";
+import { authenticateCaller } from "@/lib/session";
 
 const GROK_MODEL = "grok-4.7";
 const GEMINI_MODEL = "gemini-3.5-flash-lite";
@@ -40,6 +41,7 @@ export class ModelError extends Error {
 }
 
 export async function writeWithModel(input: DraftInput, keys: ModelKeys = EMPTY_KEYS): Promise<DraftOutput> {
+  await authenticateCaller();
   const resolved = resolveModelKey(input.provider, keys);
   if (!resolved.value) throw new ModelError("unauthorized");
   if (input.provider === "grok") return writeWithGrok(input, resolved.value);

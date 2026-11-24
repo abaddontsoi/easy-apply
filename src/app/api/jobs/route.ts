@@ -3,7 +3,7 @@ import { allowScrape } from "@/lib/guard";
 import { privateJson, readJson } from "@/lib/http";
 import { JobsError, listJob, parseJobQuery } from "@/lib/jobsdb";
 import { scrapeJobsdb } from "@/lib/scrape-jobs";
-import { requireUser } from "@/lib/session";
+import { UnauthenticatedError, requireUser } from "@/lib/session";
 import { keysForRequest } from "@/lib/user-keys";
 
 export const runtime = "nodejs";
@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     const jobs = (await scrapeJobsdb(parsed.value, keys.apify)).map(listJob);
     return privateJson({ jobs });
   } catch (error) {
+    if (error instanceof UnauthenticatedError) return privateJson({ error: "請先登入。" }, 401);
     if (error instanceof JobsError && error.code === "missing_token") {
       const message = apify.source === "user"
         ? "你儲存的 Apify 金鑰無法使用，這次沒有改用系統金鑰。"

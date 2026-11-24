@@ -5,7 +5,7 @@ import { allowWrite } from "@/lib/guard";
 import { privateJson, readJson } from "@/lib/http";
 import { saveLetter } from "@/lib/letters";
 import { ModelError, fallbackNotice, writeWithModel } from "@/lib/models";
-import { requireUser } from "@/lib/session";
+import { UnauthenticatedError, requireUser } from "@/lib/session";
 import { keysForRequest } from "@/lib/user-keys";
 
 export const runtime = "nodejs";
@@ -39,6 +39,7 @@ export async function POST(request: Request) {
     try {
       draft = await writeWithModel(parsed.value, keys);
     } catch (error) {
+      if (error instanceof UnauthenticatedError) return privateJson({ error: "請先登入。" }, 401);
       const code = error instanceof ModelError ? error.code : "unavailable";
       const source = resolved.source === "user" ? "user" : "system";
       draft = { ...composeStructured(parsed.value), notice: fallbackNotice(parsed.value.provider, code, source) };

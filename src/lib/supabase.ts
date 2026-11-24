@@ -50,6 +50,28 @@ export function supabaseConfigurationIssues(): SetupIssue[] {
   return supabaseSetupIssues(currentSupabaseEnv());
 }
 
+export function allowServiceUserForTests(): void {
+  const user = { id: "00000000-0000-4000-8000-0000000000aa", email: "writer@example.com" };
+  setSupabaseTestDoubles({
+    createAuthClient: async () => ({
+      auth: {
+        async getUser() {
+          return { data: { user }, error: null };
+        },
+        async signInWithPassword() {
+          return { data: { user, session: {} }, error: null };
+        },
+        async signUp() {
+          return { data: { user, session: {} }, error: null };
+        },
+        async signOut() {
+          return { error: null };
+        },
+      },
+    }),
+  });
+}
+
 export function setSupabaseTestDoubles(
   doubles: {
     createAuthClient?: () => Promise<SupabaseAuthDouble | null>;

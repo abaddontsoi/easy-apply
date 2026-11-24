@@ -1,6 +1,7 @@
 import { ApifyClient } from "apify-client";
 import { resolveApifyToken } from "@/lib/credentials";
 import { JOBSDB_ACTOR, JobsError, actorInput, normalizeJobs, type JobQuery, type ScrapedJob } from "@/lib/jobsdb";
+import { authenticateCaller } from "@/lib/session";
 
 export type JobRunner = (input: Record<string, unknown>) => Promise<unknown[]>;
 
@@ -17,6 +18,7 @@ export function setJobRunnerForTests(runner: JobRunner | null): void {
 }
 
 export async function scrapeJobsdb(query: JobQuery, userToken = ""): Promise<ScrapedJob[]> {
+  await authenticateCaller();
   const token = resolveApifyToken(userToken).value;
   if (testRunner) {
     const items = await testRunner(actorInput(query));
