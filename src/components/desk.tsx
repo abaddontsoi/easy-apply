@@ -582,26 +582,6 @@ export function Desk({
                       下載
                     </Button>
                   </div>
-                  {result.usedFacts.length > 0 ? (
-                    <details open className="text-sm">
-                      <summary className="cursor-pointer font-medium">文稿對上的履歷句子</summary>
-                      <ul className="mt-2 grid list-disc gap-1 pl-5 text-muted-foreground">
-                        {result.usedFacts.map((fact) => (
-                          <li key={fact}>{fact}</li>
-                        ))}
-                      </ul>
-                    </details>
-                  ) : null}
-                  {result.omissions.length > 0 ? (
-                    <details open className="text-sm">
-                      <summary className="cursor-pointer font-medium">履歷沒有支撐的要求</summary>
-                      <ul className="mt-2 grid list-disc gap-1 pl-5 text-muted-foreground">
-                        {result.omissions.map((item) => (
-                          <li key={item}>{item}</li>
-                        ))}
-                      </ul>
-                    </details>
-                  ) : null}
                 </>
               ) : null}
             </CardContent>

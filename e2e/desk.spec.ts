@@ -25,8 +25,7 @@ test("writes a structured draft on the signed-in desk", async ({ page }) => {
   const letter = page.locator("#letter");
   await expect(letter).toContainText("1,200 teams");
   await expect(letter).not.toContainText(/kubernetes/i);
-  await expect(
-    page.getByText("Kubernetes experience running production clusters", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("文稿對上的履歷句子")).toHaveCount(0);
+  await expect(page.getByText("履歷沒有支撐的要求")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Operations Manager/ })).toBeVisible();
 });
