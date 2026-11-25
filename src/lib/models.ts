@@ -1,3 +1,4 @@
+import { fitSources } from "@/lib/condense";
 import { composeStructured } from "@/lib/compose";
 import { EMPTY_KEYS, resolveModelKey, type KeySource, type ModelKeys } from "@/lib/credentials";
 import type { DraftInput, DraftOutput, Length, Provider } from "@/lib/draft";
@@ -57,15 +58,22 @@ export async function writeWithModel(
 ): Promise<DraftOutput> {
   await authenticateCaller();
   const resolved = resolveModelKey(input.provider, keys);
-  if (!resolved.value) throw new ModelError("unauthorized");
+  const key = resolved.value;
+  if (!key) throw new ModelError("unauthorized");
   const system = revision ? REVISE_SYSTEM : SYSTEM;
-  const userText = userPrompt(input, revision);
+  const fitted = await fitSources(input.resume, input.jobDescription, (prompt, user, maxTokens) =>
+    completeText(input.provider, key, prompt, user, maxTokens),
+  );
+  const userText = userPrompt(
+    { ...input, resume: fitted.resume, jobDescription: fitted.jobDescription },
+    revision,
+  );
   try {
-    return await completeOnce(input, resolved.value, system, userText);
+    return await completeOnce(input, key, system, userText);
   } catch (error) {
     if (!(error instanceof ModelError) || error.code !== "bad_response") throw error;
   }
-  return completeOnce(input, resolved.value, system, `${userText}\n\n${RETRY_HINT}`);
+  return completeOnce(input, key, system, `${userText}\n\n${RETRY_HINT}`);
 }
 
 export function fallbackNotice(
@@ -134,6 +142,49 @@ async function completeOnce(
   const parsed = parseModelJson(text);
   if (!parsed) throw new ModelError("bad_response");
   return normalizeModel(input, parsed);
+}
+
+async function completeText(
+  provider: Provider,
+  key: string,
+  system: string,
+  userText: string,
+  maxTokens: number,
+): Promise<string> {
+  const payload =
+    provider === "grok"
+      ? await postJson(
+          GROK_ENDPOINT,
+          {
+            authorization: `Bearer ${key}`,
+            "content-type": "application/json",
+          },
+          {
+            model: GROK_MODEL,
+            temperature: 0.2,
+            max_tokens: maxTokens,
+            messages: [
+              { role: "system", content: system },
+              { role: "user", content: userText },
+            ],
+          },
+        )
+      : await postJson(
+          GEMINI_ENDPOINT,
+          {
+            "content-type": "application/json",
+            "x-goog-api-key": key,
+          },
+          {
+            systemInstruction: { parts: [{ text: system }] },
+            contents: [{ role: "user", parts: [{ text: userText }] }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: maxTokens,
+            },
+          },
+        );
+  return provider === "grok" ? readChatContent(payload) : readGeminiContent(payload);
 }
 
 async function postJson(

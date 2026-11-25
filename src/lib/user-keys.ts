@@ -5,7 +5,6 @@ import type { Session } from "@/lib/session";
 type Row = {
   grok_key?: unknown;
   gemini_key?: unknown;
-  apify_token?: unknown;
 };
 
 export type KeyLoad =
@@ -23,7 +22,7 @@ export async function keysForRequest(session: Session): Promise<StoredKeys | Res
 export async function loadUserKeys(session: Session): Promise<KeyLoad> {
   const { data, error } = await session.data
     .from("user_secrets")
-    .select("grok_key, gemini_key, apify_token")
+    .select("grok_key, gemini_key")
     .eq("user_id", session.userId)
     .maybeSingle();
   if (error) {
@@ -48,12 +47,10 @@ export async function saveUserKeys(session: Session, patch: KeyPatch): Promise<S
   const next: StoredKeys = {
     grok: patch.grok ?? loaded.keys.grok,
     gemini: patch.gemini ?? loaded.keys.gemini,
-    apify: patch.apify ?? loaded.keys.apify,
   };
   const record = {
     grok_key: next.grok,
     gemini_key: next.gemini,
-    apify_token: next.apify,
     updated_at: new Date().toISOString(),
   };
   const { data, error } = await session.data
@@ -64,7 +61,7 @@ export async function saveUserKeys(session: Session, patch: KeyPatch): Promise<S
     .maybeSingle();
   if (error) return writeFailure(error);
   if (data) return next;
-  if (!next.grok && !next.gemini && !next.apify) return next;
+  if (!next.grok && !next.gemini) return next;
 
   const inserted = await session.data
     .from("user_secrets")
@@ -79,7 +76,6 @@ function toKeys(row: Row): StoredKeys {
   return {
     grok: text(row.grok_key),
     gemini: text(row.gemini_key),
-    apify: text(row.apify_token),
   };
 }
 

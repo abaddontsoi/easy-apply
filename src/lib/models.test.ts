@@ -242,6 +242,108 @@ describe("model helpers", { concurrency: 1 }, () => {
     assert.equal(called, false);
   });
 
+  it("rewrites an oversized résumé before the letter prompt", async () => {
+    rememberKeys();
+    process.env.XAI_API_KEY = FAKE_KEY;
+    const padding = "歷".repeat(8_001);
+    const calls = stubRoute((system) => {
+      if (system.startsWith("You compress")) {
+        return { choices: [{ message: { content: "Chloe Chan\nRan the launch calendar for 1,200 teams." } }] };
+      }
+      return chat({
+        subject: "Hello",
+        letter: "Letter body.",
+        email: "Email body.",
+        usedFacts: ["1,200 teams"],
+        omissions: [],
+      });
+    });
+    const draft = await writeWithModel(input({ resume: `Chloe Chan\n${padding}` }));
+    assert.equal(draft.letter, "Letter body.");
+    const rewrites = calls.filter((call) => systemText(call).startsWith("You compress"));
+    const letters = calls.filter((call) => systemText(call).startsWith("You write"));
+    assert.equal(rewrites.length, 2);
+    assert.equal(letters.length, 1);
+    assert.match(userText(rewrites[0]), /Compress this résumé/);
+    assert.equal(userText(rewrites[0]).includes(padding.slice(0, 20)), true);
+    const letterPrompt = userText(letters[0]);
+    assert.match(letterPrompt, /1,200 teams/);
+    assert.equal(letterPrompt.includes(padding.slice(0, 500)), false);
+    const sent = JSON.parse(String(rewrites[0]?.init.body)) as { temperature?: number; max_tokens?: number };
+    assert.equal(sent.temperature, 0.2);
+    assert.ok((sent.max_tokens ?? 0) < 4_000);
+  });
+
+  it("asks Gemini for plain text when the job description exceeds the input budget", async () => {
+    rememberKeys();
+    process.env.GEMINI_API_KEY = FAKE_KEY;
+    const job = `職責說明。${"需".repeat(4_001)}`;
+    const calls = stubRoute((system) => {
+      if (system.startsWith("You compress")) return geminiText("Operations Manager\nOwn the launch calendar.");
+      return geminiText(
+        JSON.stringify({
+          subject: "主旨",
+          letter: "信。",
+          email: "",
+          usedFacts: [],
+          omissions: [],
+        }),
+      );
+    });
+    const draft = await writeWithModel(input({ provider: "gemini", format: "letter", jobDescription: job }));
+    assert.equal(draft.letter, "信。");
+    const rewrite = calls.find((call) => systemText(call).startsWith("You compress"));
+    const letter = calls.find((call) => systemText(call).startsWith("You write"));
+    assert.ok(rewrite);
+    assert.ok(letter);
+    const rewriteBody = JSON.parse(String(rewrite?.init.body)) as {
+      generationConfig?: { temperature?: number; maxOutputTokens?: number; responseMimeType?: string };
+    };
+    assert.equal(rewriteBody.generationConfig?.temperature, 0.2);
+    assert.equal(rewriteBody.generationConfig?.responseMimeType, undefined);
+    assert.ok((rewriteBody.generationConfig?.maxOutputTokens ?? 0) < 4_000);
+    assert.match(userText(letter), /Own the launch calendar/);
+    assert.equal(userText(letter).includes(job), false);
+  });
+
+  it("uses a clipped excerpt when the rewrite is empty and still writes the letter", async () => {
+    rememberKeys();
+    process.env.XAI_API_KEY = FAKE_KEY;
+    const resume = `Chloe Chan\nKept metric 1,200 teams.\n${"經歷".repeat(5_000)}`;
+    const calls = stubRoute((system) => {
+      if (system.startsWith("You compress")) return { choices: [{ message: { content: "   " } }] };
+      return chat({
+        subject: "Hello",
+        letter: "Letter body.",
+        email: "",
+        usedFacts: ["1,200 teams"],
+        omissions: [],
+      });
+    });
+    const draft = await writeWithModel(input({ format: "letter", resume }));
+    assert.equal(draft.letter, "Letter body.");
+    const letter = calls.find((call) => systemText(call).startsWith("You write"));
+    const résumé = quoted(userText(letter), "Résumé");
+    assert.match(résumé, /Chloe Chan/);
+    assert.match(résumé, /1,200/);
+    assert.ok(résumé.length <= 6_000);
+  });
+
+  it("does not call the letter model when rewriting is unauthorized", async () => {
+    rememberKeys();
+    process.env.XAI_API_KEY = FAKE_KEY;
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls += 1;
+      return new Response("no", { status: 401 });
+    }) as typeof fetch;
+    await assert.rejects(
+      writeWithModel(input({ resume: `Chloe Chan\n${"歷".repeat(8_001)}` })),
+      (error: unknown) => error instanceof ModelError && error.code === "unauthorized",
+    );
+    assert.equal(calls, 2);
+  });
+
   it("does not call the network when the key is missing", async () => {
     rememberKeys();
     delete process.env.XAI_API_KEY;
@@ -343,6 +445,43 @@ function stubFetch(payload: unknown): { url: string; init: RequestInit }[] {
     return Response.json(payload);
   }) as typeof fetch;
   return calls;
+}
+
+function stubRoute(reply: (system: string) => unknown): { url: string; init: RequestInit }[] {
+  const calls: { url: string; init: RequestInit }[] = [];
+  globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+    const call = { url: String(url), init: init ?? {} };
+    calls.push(call);
+    return Response.json(reply(systemText(call)));
+  }) as typeof fetch;
+  return calls;
+}
+
+function systemText(call: { init: RequestInit } | undefined): string {
+  if (!call) return "";
+  const body = JSON.parse(String(call.init.body)) as {
+    messages?: { content?: string }[];
+    systemInstruction?: { parts?: { text?: string }[] };
+  };
+  return body.messages?.[0]?.content ?? body.systemInstruction?.parts?.[0]?.text ?? "";
+}
+
+function userText(call: { init: RequestInit } | undefined): string {
+  if (!call) return "";
+  const body = JSON.parse(String(call.init.body)) as {
+    messages?: { content?: string }[];
+    contents?: { parts?: { text?: string }[] }[];
+  };
+  return body.messages?.[1]?.content ?? body.contents?.[0]?.parts?.[0]?.text ?? "";
+}
+
+function quoted(text: string, label: string): string {
+  const marker = `${label}:\n"""\n`;
+  const start = text.indexOf(marker);
+  if (start < 0) return "";
+  const from = start + marker.length;
+  const end = text.indexOf('\n"""', from);
+  return end < 0 ? text.slice(from) : text.slice(from, end);
 }
 
 function bearerMatches(init: RequestInit | undefined): boolean {

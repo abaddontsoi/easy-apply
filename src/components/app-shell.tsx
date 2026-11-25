@@ -38,7 +38,7 @@ export function AppShell({
         </div>
         <nav aria-label="主要" className="grid gap-1 px-3">
           <ShellLink href="/jobs" current={pathname === "/jobs"}>
-            搜尋職缺
+            職缺連結
           </ShellLink>
           <ShellLink href="/" current={pathname === "/"}>
             寫作新信件

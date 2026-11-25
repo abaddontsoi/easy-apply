@@ -20,6 +20,7 @@ const blankSecrets = {
   SUPABASE_SECRET_KEY: "",
   XAI_API_KEY: "",
   GEMINI_API_KEY: "",
+  APIFY_TOKEN: "",
   COVER_DESK_E2E: "",
   INFISICAL_ID: "",
   INFISICAL_PROJECT_ID: "",

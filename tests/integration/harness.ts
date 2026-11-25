@@ -1,7 +1,7 @@
 import { afterEach, beforeEach } from "node:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resetWritesForTests } from "../../src/lib/guard";
-import { setJobRunnerForTests } from "../../src/lib/scrape-jobs";
+import { setJobsdbFetcherForTests } from "../../src/lib/read-jobsdb";
 import { createMemoryDataClient, type MemoryLetter } from "../../src/lib/memory-letters";
 import { SAMPLE_JOB, SAMPLE_RESUME } from "../../src/lib/sample";
 import { setSupabaseTestDoubles, type SupabaseAuthDouble } from "../../src/lib/supabase";
@@ -20,7 +20,6 @@ const KEYS = [
   "SUPABASE_SECRET_KEY",
   "XAI_API_KEY",
   "GEMINI_API_KEY",
-  "APIFY_TOKEN",
   "COVER_DESK_E2E",
   "NODE_ENV",
 ] as const;
@@ -34,7 +33,7 @@ export function installTestEnv(): void {
     writeEnv("NODE_ENV", "test");
     clearSecrets();
     setSupabaseTestDoubles(null);
-    setJobRunnerForTests(null);
+    setJobsdbFetcherForTests(null);
     resetWritesForTests();
     globalThis.fetch = originalFetch;
   });
@@ -42,7 +41,7 @@ export function installTestEnv(): void {
   afterEach(() => {
     writeEnv("NODE_ENV", "test");
     setSupabaseTestDoubles(null);
-    setJobRunnerForTests(null);
+    setJobsdbFetcherForTests(null);
     resetWritesForTests();
     globalThis.fetch = originalFetch;
     for (const [key, value] of saved) {
@@ -61,7 +60,6 @@ export function clearSecrets(): void {
   delete process.env.SUPABASE_SECRET_KEY;
   delete process.env.XAI_API_KEY;
   delete process.env.GEMINI_API_KEY;
-  delete process.env.APIFY_TOKEN;
   delete process.env.COVER_DESK_E2E;
 }
 

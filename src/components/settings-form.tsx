@@ -9,7 +9,6 @@ import { useState, type FormEvent } from "react";
 const FIELDS = [
   { id: "grok", label: "Grok", hint: "xAI API 金鑰" },
   { id: "gemini", label: "Gemini", hint: "Google AI API 金鑰" },
-  { id: "apify", label: "Apify", hint: "JobsDB 搜尋用的 API 金鑰" },
 ] as const;
 
 type FieldId = (typeof FIELDS)[number]["id"];
@@ -22,7 +21,7 @@ export function SettingsForm({
   warning: string;
 }) {
   const [status, setStatus] = useState(initial);
-  const [draft, setDraft] = useState<Record<FieldId, string>>({ grok: "", gemini: "", apify: "" });
+  const [draft, setDraft] = useState<Record<FieldId, string>>({ grok: "", gemini: "" });
   const [error, setError] = useState(warning);
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState<FieldId | "save" | "">("");
@@ -43,7 +42,7 @@ export function SettingsForm({
         return;
       }
       setStatus(body);
-      setDraft({ grok: "", gemini: "", apify: "" });
+      setDraft({ grok: "", gemini: "" });
       const stored = Object.values(patch).some((value) => value.trim());
       setNotice(stored ? "已儲存。有填的金鑰會取代系統金鑰。" : "已清除。沒有個人金鑰時會使用系統金鑰。");
     } catch {
@@ -73,7 +72,7 @@ export function SettingsForm({
       <div>
         <h2 className="font-serif text-2xl">金鑰</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          金鑰只存在 Supabase，這一頁只顯示末四碼。某個欄位有你的金鑰時，撰寫或搜尋就用它，不再用系統金鑰。
+          金鑰只存在 Supabase，這一頁只顯示末四碼。某個欄位有你的金鑰時，撰寫就用它，不再用系統金鑰。
         </p>
       </div>
       <form className="grid gap-5 rounded-xl bg-card p-5 ring-1 ring-foreground/10" onSubmit={onSubmit}>
@@ -131,7 +130,7 @@ function sourceLabel(source: KeySource, mask: string): string {
 function isView(value: unknown): value is SettingsView {
   if (!value || typeof value !== "object") return false;
   const record = value as Record<string, unknown>;
-  return ["grok", "gemini", "apify"].every((field) => {
+  return ["grok", "gemini"].every((field) => {
     const status = record[field];
     if (!status || typeof status !== "object") return false;
     const item = status as { source?: unknown; mask?: unknown };

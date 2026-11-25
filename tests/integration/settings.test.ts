@@ -81,7 +81,7 @@ describe("settings", { concurrency: 1 }, () => {
     assert.equal(signedOut.status, 401);
 
     desk.signInAs(USER_A.id);
-    const broken = await saveSettings(jsonRequest("http://127.0.0.1/api/settings", { apify: "not a token" }));
+    const broken = await saveSettings(jsonRequest("http://127.0.0.1/api/settings", { grok: "not a token" }));
     assert.equal(broken.status, 400);
     assert.equal(desk.secrets.length, 0);
   });
