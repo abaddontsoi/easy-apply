@@ -4,12 +4,11 @@ import {
   describeKeys,
   maskSecret,
   parseKeyPatch,
-  resolveApifyToken,
   resolveModelKey,
   resolveOwnedSecret,
 } from "./credentials";
 
-const KEYS = ["XAI_API_KEY", "GEMINI_API_KEY", "APIFY_TOKEN"] as const;
+const KEYS = ["XAI_API_KEY", "GEMINI_API_KEY"] as const;
 const saved = new Map<string, string | undefined>();
 
 describe("credentials", () => {
@@ -32,10 +31,10 @@ describe("credentials", () => {
     if (!savedKey.ok) return;
     assert.deepEqual(savedKey.patch, { grok: "grok-user-key-1234", gemini: "" });
 
-    const cleared = parseKeyPatch({ apify: null });
+    const cleared = parseKeyPatch({ gemini: null });
     assert.equal(cleared.ok, true);
     if (!cleared.ok) return;
-    assert.deepEqual(cleared.patch, { apify: "" });
+    assert.deepEqual(cleared.patch, { gemini: "" });
 
     assert.equal(parseKeyPatch({}).ok, false);
     assert.equal(parseKeyPatch({ grok: "short" }).ok, false);
@@ -47,8 +46,6 @@ describe("credentials", () => {
     remember();
     process.env.XAI_API_KEY = "system-grok-key";
     process.env.GEMINI_API_KEY = "system-gemini-key";
-    process.env.APIFY_TOKEN = "\"system-apify-token\"";
-
     assert.deepEqual(resolveModelKey("grok", { grok: "user-grok-key", gemini: "" }), {
       value: "user-grok-key",
       source: "user",
@@ -57,20 +54,17 @@ describe("credentials", () => {
       value: "system-gemini-key",
       source: "system",
     });
-    assert.deepEqual(resolveApifyToken("bad token"), { value: "", source: "user" });
-    assert.deepEqual(resolveApifyToken(""), { value: "system-apify-token", source: "system" });
     assert.deepEqual(resolveOwnedSecret("", undefined), { value: "", source: "none" });
+    assert.deepEqual(resolveOwnedSecret("bad token", "system-gemini-key"), { value: "", source: "user" });
   });
 
   it("describes a saved key with a mask and hides the system key", () => {
     remember();
     process.env.XAI_API_KEY = "system-grok-key";
     delete process.env.GEMINI_API_KEY;
-    delete process.env.APIFY_TOKEN;
-    const view = describeKeys({ grok: "grok-user-key-1234", gemini: "", apify: "" });
+    const view = describeKeys({ grok: "grok-user-key-1234", gemini: "" });
     assert.deepEqual(view.grok, { source: "user", mask: "••••1234" });
     assert.deepEqual(view.gemini, { source: "none", mask: "" });
-    assert.deepEqual(view.apify, { source: "none", mask: "" });
     assert.equal(JSON.stringify(view).includes("system-grok-key"), false);
     assert.equal(JSON.stringify(view).includes("grok-user-key-1234"), false);
   });

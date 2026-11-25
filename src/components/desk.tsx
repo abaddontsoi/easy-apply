@@ -419,7 +419,7 @@ export function Desk({
                   <Label htmlFor="job">職缺說明</Label>
                   <span className="flex flex-wrap items-center justify-end gap-3">
                     <Link href="/jobs" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-                      從 JobsDB 搜尋
+                      貼上 JobsDB 連結
                     </Link>
                     <span className={counterClass(jobDescription.length)}>
                       {jobDescription.length.toLocaleString("zh-Hant")} / 20,000
@@ -507,7 +507,7 @@ export function Desk({
                   <p className="font-serif text-2xl">信會寫在這裡。</p>
                   <ol className="mt-4 grid list-decimal gap-2 pl-4 text-sm leading-6 text-muted-foreground">
                     <li>到設定頁儲存履歷，或先載入虛構職缺範例。</li>
-                    <li>到搜尋職缺選定一筆，或在這裡貼上職缺說明。</li>
+                    <li>到職缺連結貼上 JobsDB 網址，或在這裡貼上職缺說明。</li>
                     <li>撰寫後可以改字，再儲存、複製或下載。內容在 Supabase。</li>
                   </ol>
                 </div>

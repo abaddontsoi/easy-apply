@@ -1,112 +1,55 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  JOBSDB_ACTOR,
-  actorInput,
-  jobBrief,
-  listJob,
-  normalizeJobs,
-  parseJobQuery,
-} from "./jobsdb";
+import { extractJobsdbJob, parseJobsdbLink } from "./jobsdb";
 
-const LISTING = {
-  id: "86136632",
-  title: "Software Engineer",
-  salary: "N/A",
-  workTypes: "Full Time",
-  workArrangements: ["Hybrid"],
-  jobLink: "https://hk.jobsdb.com/job/86136632",
-  listedAt: "2026-11-01T23:46:54.688Z",
-  advertiser: { name: "Northwind" },
-  companyProfile: { name: "N/A" },
-  joblocationInfo: { displayLocation: "Central, Hong Kong", location: "Hong Kong" },
-  content: {
-    sections: ["Build the billing API.", "Three years of TypeScript."],
-    unEditedContent: "<p>ignored when sections exist</p>",
-  },
-};
+const PAGE = `
+<h1 data-automation="job-detail-title">Software Engineer, Backend</h1>
+<span data-automation="advertiser-name">Osmium Consulting Group Limited<!-- --> <span><svg></svg></span></span>
+<span data-automation="job-detail-location"><a href="/area">Tsim Sha Tsui</a></span>
+<span data-automation="job-detail-work-type"><a href="/full-time">Full time</a></span>
+<div data-automation="jobAdDetails"><div><p><strong>Job Responsibilities</strong></p><ul><li><p>Design backend services using Golang and Java.</p></li></ul><p>Requirements &amp; notes.</p></div></div>
+`;
 
-describe("parseJobQuery", () => {
-  it("defaults to Hong Kong JobsDB and clamps the result count", () => {
-    const parsed = parseJobQuery({ keyword: "  software   engineer ", location: " Central ", maxResults: 50 });
-    assert.equal(parsed.ok, true);
-    if (!parsed.ok) return;
-    assert.deepEqual(parsed.value, {
-      country: "hongkong",
-      keyword: "software engineer",
-      location: "Central",
-      maxResults: 20,
-    });
-    const input = actorInput(parsed.value);
-    assert.deepEqual(input, {
-      searchTerm: "software engineer",
-      country: "hongkong",
-      maxResults: 20,
-      requireEmail: false,
-      requirePhone: false,
-      requireEmailPhone: false,
-      includeOneInTitle: [],
-      location: "Central",
-      workTypes: [],
-      workArrangements: [],
-      subclassifications: false,
-    });
-    assert.equal("accounting" in input, false);
-    assert.equal("searchUrl" in input, false);
-    assert.equal(JOBSDB_ACTOR, "websift/seek-job-scraper");
+describe("parseJobsdbLink", () => {
+  it("accepts a Hong Kong or Thailand job page and drops the query", () => {
+    const hongKong = parseJobsdbLink("  https://hk.jobsdb.com/job/95749564/?type=standard#top  ");
+    assert.equal(hongKong.ok, true);
+    if (!hongKong.ok) return;
+    assert.equal(hongKong.id, "95749564");
+    assert.equal(hongKong.url, "https://hk.jobsdb.com/job/95749564");
+
+    const thailand = parseJobsdbLink("https://th.jobsdb.com/job/42/");
+    assert.equal(thailand.ok, true);
+    if (thailand.ok) assert.equal(thailand.url, "https://th.jobsdb.com/job/42");
   });
 
-  it("accepts Thailand and rejects other actor countries", () => {
-    const thailand = parseJobQuery({ keyword: "accountant", country: "thailand", maxResults: "12" });
-    assert.equal(thailand.ok, true);
-    if (thailand.ok) {
-      assert.equal(thailand.value.country, "thailand");
-      const input = actorInput(thailand.value);
-      assert.equal(input.country, "thailand");
-      assert.equal(input.searchTerm, "accountant");
-      assert.equal(input.maxResults, 12);
-      assert.equal(input.requireEmail, false);
-    }
-
-    const australia = parseJobQuery({ keyword: "engineer", country: "australia" });
-    assert.equal(australia.ok, false);
-    if (!australia.ok) assert.match(australia.error, /香港或泰國/);
-
-    const short = parseJobQuery({ keyword: "a" });
-    assert.equal(short.ok, false);
+  it("rejects search pages and other hosts", () => {
+    assert.equal(parseJobsdbLink("https://hk.jobsdb.com/jobs").ok, false);
+    assert.equal(parseJobsdbLink("https://www.jobsdb.com/job/95749564").ok, false);
+    assert.equal(parseJobsdbLink("http://hk.jobsdb.com/job/95749564").ok, false);
+    assert.equal(parseJobsdbLink("https://user:pass@hk.jobsdb.com/job/95749564").ok, false);
+    assert.equal(parseJobsdbLink("https://hk.jobsdb.com.evil.example/job/95749564").ok, false);
+    const missing = parseJobsdbLink("");
+    assert.equal(missing.ok, false);
+    if (!missing.ok) assert.match(missing.error, /職缺連結/);
   });
 });
 
-describe("normalizeJobs", () => {
-  it("turns a JobsDB listing into a letter brief and drops empty rows", () => {
-    const jobs = normalizeJobs([
-      LISTING,
-      { ...LISTING },
-      { title: "N/A", jobLink: "http://hk.jobsdb.com/job/1" },
-      {
-        id: 99,
-        title: "Support Analyst",
-        salary: "HK$25,000 - HK$30,000",
-        jobLink: "not a url",
-        content: { unEditedContent: "<p>Answer tickets.</p><p>SQL &amp; Excel</p>" },
-      },
-    ]);
-    assert.equal(jobs.length, 2);
-    assert.equal(jobs[0]?.company, "Northwind");
-    assert.equal(jobs[0]?.salary, "");
-    assert.equal(jobs[0]?.arrangement, "Hybrid");
-    assert.equal(jobs[0]?.listedAt, "2026-11-01");
-    assert.equal(jobs[0]?.url, "https://hk.jobsdb.com/job/86136632");
-    assert.match(jobs[0]?.description ?? "", /billing API/);
-    assert.doesNotMatch(jobs[0]?.description ?? "", /ignored/);
+describe("extractJobsdbJob", () => {
+  it("reads the title, company, and description from the job page", () => {
+    const job = extractJobsdbJob(PAGE, "https://hk.jobsdb.com/job/95749564");
+    assert.ok(job);
+    assert.equal(job?.title, "Software Engineer, Backend");
+    assert.equal(job?.company, "Osmium Consulting Group Limited");
+    assert.equal(job?.location, "Tsim Sha Tsui");
+    assert.equal(job?.workType, "Full time");
+    assert.match(job?.text ?? "", /Design backend services using Golang and Java/);
+    assert.match(job?.text ?? "", /Requirements & notes/);
+    assert.match(job?.text ?? "", /https:\/\/hk\.jobsdb\.com\/job\/95749564/);
+    assert.doesNotMatch(job?.text ?? "", /<p>/);
+  });
 
-    const listed = listJob(jobs[0]!);
-    assert.match(listed.text, /Northwind · Central, Hong Kong/);
-    assert.match(listed.text, /刊登 2026-11-01/);
-    assert.equal(listed.text, jobBrief(jobs[0]!));
-
-    assert.equal(jobs[1]?.id, "99");
-    assert.equal(jobs[1]?.url, "");
-    assert.match(jobs[1]?.description ?? "", /SQL & Excel/);
+  it("returns nothing when the posting has no description", () => {
+    assert.equal(extractJobsdbJob("<h1 data-automation=\"job-detail-title\">Role</h1>", "https://hk.jobsdb.com/job/1"), null);
   });
 });

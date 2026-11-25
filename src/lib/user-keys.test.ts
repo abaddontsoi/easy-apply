@@ -26,7 +26,7 @@ describe("user keys", () => {
     assert.equal(cleared.grok, "");
 
     const missing = session("user-a", secrets, "42P01");
-    const failed = await saveUserKeys(missing, { apify: "apify-user-token" });
+    const failed = await saveUserKeys(missing, { gemini: "gemini-user-key" });
     assert.ok(failed instanceof Response);
     if (!(failed instanceof Response)) return;
     assert.equal(failed.status, 500);

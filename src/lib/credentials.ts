@@ -10,9 +10,7 @@ export type ModelKeys = {
   gemini: string;
 };
 
-export type StoredKeys = ModelKeys & {
-  apify: string;
-};
+export type StoredKeys = ModelKeys;
 
 export type KeyFieldStatus = {
   source: KeySource;
@@ -22,14 +20,13 @@ export type KeyFieldStatus = {
 export type SettingsView = {
   grok: KeyFieldStatus;
   gemini: KeyFieldStatus;
-  apify: KeyFieldStatus;
 };
 
 export type KeyPatch = Partial<StoredKeys>;
 
 const SECRET_PATTERN = /^[\x21-\x7E]{8,200}$/;
 
-export const EMPTY_KEYS: StoredKeys = { grok: "", gemini: "", apify: "" };
+export const EMPTY_KEYS: StoredKeys = { grok: "", gemini: "" };
 
 export function maskSecret(value: string): string {
   const trimmed = value.trim();
@@ -43,7 +40,7 @@ export function parseKeyPatch(value: unknown): { ok: true; patch: KeyPatch } | {
   }
   const record = value as Record<string, unknown>;
   const patch: KeyPatch = {};
-  for (const field of ["grok", "gemini", "apify"] as const) {
+  for (const field of ["grok", "gemini"] as const) {
     if (!Object.prototype.hasOwnProperty.call(record, field)) continue;
     const raw = record[field];
     if (raw === null) {
@@ -81,15 +78,10 @@ export function resolveModelKey(provider: "grok" | "gemini", keys: ModelKeys = E
   return resolveOwnedSecret(userValue, systemValue);
 }
 
-export function resolveApifyToken(userToken = ""): ResolvedSecret {
-  return resolveOwnedSecret(userToken, process.env.APIFY_TOKEN);
-}
-
 export function describeKeys(keys: StoredKeys): SettingsView {
   return {
     grok: describeField(keys.grok, process.env.XAI_API_KEY),
     gemini: describeField(keys.gemini, process.env.GEMINI_API_KEY),
-    apify: describeField(keys.apify, process.env.APIFY_TOKEN),
   };
 }
 

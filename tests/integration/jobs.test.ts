@@ -1,78 +1,61 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { POST as searchJobs } from "../../src/app/api/jobs/route";
-import { JobsError } from "../../src/lib/jobsdb";
-import { setJobRunnerForTests } from "../../src/lib/scrape-jobs";
+import { POST as readJob } from "../../src/app/api/jobs/route";
+import { setJobsdbFetcherForTests } from "../../src/lib/read-jobsdb";
 import { USER_A, configureTestEnv, installDesk, installTestEnv, jsonRequest, readPayload } from "./harness";
 
 installTestEnv();
 
-const listing = {
-  id: "86136632",
-  title: "Software Engineer",
-  salary: "HK$40,000",
-  advertiser: { name: "Northwind" },
-  joblocationInfo: { displayLocation: "Central" },
-  jobLink: "https://hk.jobsdb.com/job/86136632",
-  content: { sections: ["Build the billing API."] },
-};
+const PAGE = `<h1 data-automation="job-detail-title">Software Engineer</h1>
+<span data-automation="advertiser-name">Northwind</span>
+<span data-automation="job-detail-location">Central</span>
+<div data-automation="jobAdDetails"><p>Build the billing API and keep the launch calendar for 1,200 teams.</p></div>`;
 
 describe("jobs route", { concurrency: 1 }, () => {
-  it("rejects a signed-out search and a short keyword", async () => {
+  it("rejects a signed-out request and a link that is not a JobsDB posting", async () => {
     configureTestEnv();
     const desk = installDesk([USER_A]);
     desk.signInAs(null);
-    const signedOut = await searchJobs(
-      jsonRequest("http://127.0.0.1/api/jobs", { keyword: "engineer", country: "hongkong" }),
-    );
+    const signedOut = await readJob(jsonRequest("http://127.0.0.1/api/jobs", { url: "https://hk.jobsdb.com/job/95749564" }));
     assert.equal(signedOut.status, 401);
 
     desk.signInAs(USER_A.id);
-    const short = await searchJobs(jsonRequest("http://127.0.0.1/api/jobs", { keyword: "a" }));
-    assert.equal(short.status, 400);
-    assert.match(String((await readPayload(short)).error), /關鍵字/);
+    const search = await readJob(jsonRequest("http://127.0.0.1/api/jobs", { url: "https://hk.jobsdb.com/software-engineer-jobs" }));
+    assert.equal(search.status, 400);
+    assert.match(String((await readPayload(search)).error), /職缺/);
   });
 
-  it("returns JobsDB listings from the actor runner", async () => {
+  it("returns the posting from the page fetcher", async () => {
     configureTestEnv();
     installDesk([USER_A]);
-    setJobRunnerForTests(async (input) => {
-      assert.equal(input.country, "thailand");
-      assert.equal(input.searchTerm, "accountant");
-      return [listing, { title: "" }];
-    });
-    const response = await searchJobs(
-      jsonRequest("http://127.0.0.1/api/jobs", { keyword: "accountant", country: "thailand" }),
+    setJobsdbFetcherForTests(async () => new Response(PAGE, { status: 200 }));
+    const response = await readJob(
+      jsonRequest("http://127.0.0.1/api/jobs", { url: "https://hk.jobsdb.com/job/95749564/" }),
     );
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("cache-control"), "private, no-store");
     const body = await readPayload(response);
-    const jobs = body.jobs as { title: string; company: string; text: string }[];
-    assert.equal(jobs.length, 1);
-    assert.equal(jobs[0]?.title, "Software Engineer");
-    assert.equal(jobs[0]?.company, "Northwind");
-    assert.match(jobs[0]?.text ?? "", /billing API/);
+    const job = body.job as { company?: string; role?: string; text?: string };
+    assert.equal(job.company, "Northwind");
+    assert.equal(job.role, "Software Engineer");
+    assert.match(job.text ?? "", /billing API/);
+    assert.match(job.text ?? "", /https:\/\/hk\.jobsdb\.com\/job\/95749564/);
   });
 
-  it("names APIFY_TOKEN when the token is missing and maps actor failures", async () => {
+  it("maps a timeout and a page without a description", async () => {
     configureTestEnv();
     installDesk([USER_A]);
-    const missing = await searchJobs(jsonRequest("http://127.0.0.1/api/jobs", { keyword: "engineer" }));
-    assert.equal(missing.status, 503);
-    const missingBody = await readPayload(missing);
-    assert.match(String(missingBody.error), /APIFY_TOKEN/);
-    assert.doesNotMatch(String(missingBody.error), /apify_api_/);
-
-    setJobRunnerForTests(async () => {
-      throw new JobsError("timeout");
+    setJobsdbFetcherForTests(async () => {
+      const error = new Error("timed out");
+      error.name = "TimeoutError";
+      throw error;
     });
-    const timedOut = await searchJobs(jsonRequest("http://127.0.0.1/api/jobs", { keyword: "engineer" }));
+    const timedOut = await readJob(jsonRequest("http://127.0.0.1/api/jobs", { url: "https://hk.jobsdb.com/job/95749564" }));
     assert.equal(timedOut.status, 504);
 
-    setJobRunnerForTests(async () => {
-      throw new JobsError("unavailable");
-    });
-    const failed = await searchJobs(jsonRequest("http://127.0.0.1/api/jobs", { keyword: "engineer" }));
-    assert.equal(failed.status, 502);
+    setJobsdbFetcherForTests(async () => new Response("<html></html>", { status: 200 }));
+    const empty = await readJob(jsonRequest("http://127.0.0.1/api/jobs", { url: "https://th.jobsdb.com/job/42" }));
+    assert.equal(empty.status, 422);
+    assert.match(String((await readPayload(empty)).error), /讀不到這則職缺/);
   });
 });
