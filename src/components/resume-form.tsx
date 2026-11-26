@@ -1,8 +1,8 @@
 "use client";
 
+import { KeywordArea, KeywordBook } from "@/components/keyword-book";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { SAMPLE_RESUME } from "@/lib/sample";
 import { cn } from "@/lib/utils";
 import { Download, FileUp } from "lucide-react";
@@ -143,6 +143,7 @@ export function ResumeForm({ initial, warning = "" }: { initial: ResumeInitial |
   }
 
   return (
+    <KeywordBook>
     <section className="grid gap-4 rounded-xl bg-card p-5 ring-1 ring-foreground/10">
       <div>
         <h2 className="font-serif text-2xl">履歷</h2>
@@ -157,7 +158,7 @@ export function ResumeForm({ initial, warning = "" }: { initial: ResumeInitial |
             {text.length.toLocaleString("zh-Hant")} / 20,000
           </span>
         </div>
-        <Textarea
+        <KeywordArea
           id="resume"
           value={text}
           maxLength={20000}
@@ -197,6 +198,7 @@ export function ResumeForm({ initial, warning = "" }: { initial: ResumeInitial |
         {note ? <p className="text-xs text-muted-foreground">{note}</p> : null}
       </div>
     </section>
+    </KeywordBook>
   );
 }
 

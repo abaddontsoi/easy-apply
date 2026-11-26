@@ -40,6 +40,7 @@ let dataFactory: (() => SupabaseClient | null) | null = null;
 let e2eLetters: MemoryLetter[] | null = null;
 let e2eSecrets: MemoryLetter[] | null = null;
 let e2eResumes: MemoryLetter[] | null = null;
+let e2eKeywords: MemoryLetter[] | null = null;
 
 export function supabaseConfigured(): boolean {
   if (e2eDeskEnabled()) return true;
@@ -182,5 +183,10 @@ function e2eDataClient(): SupabaseClient {
   e2eLetters ??= [];
   e2eSecrets ??= [];
   e2eResumes ??= [];
-  return createMemoryDataClient(e2eLetters, { secrets: e2eSecrets, resumes: e2eResumes }) as unknown as SupabaseClient;
+  e2eKeywords ??= [];
+  return createMemoryDataClient(e2eLetters, {
+    secrets: e2eSecrets,
+    resumes: e2eResumes,
+    keywords: e2eKeywords,
+  }) as unknown as SupabaseClient;
 }

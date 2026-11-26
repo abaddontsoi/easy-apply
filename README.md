@@ -9,7 +9,7 @@ Accounts, résumés, job descriptions, and letters live in Supabase. Nothing is 
 ## Supabase
 
 1. Create a project.
-2. In the SQL editor, run `supabase/migrations/0001_letters.sql`, then `supabase/migrations/0002_lock_letters.sql`, then `supabase/migrations/0003_user_secrets.sql`, then `supabase/migrations/0004_resumes.sql`.
+2. In the SQL editor, run `supabase/migrations/0001_letters.sql`, then `supabase/migrations/0002_lock_letters.sql`, then `supabase/migrations/0003_user_secrets.sql`, then `supabase/migrations/0004_resumes.sql`, then `supabase/migrations/0005_keywords.sql`.
 3. Enable email sign-in. Set the Site URL to the Railway URL.
 4. In Settings → API Keys, open Publishable and secret keys. Create the publishable key and a secret key used only by this app. Disable the legacy `anon` and `service_role` keys. Do not copy a key that starts with `eyJ`.
 

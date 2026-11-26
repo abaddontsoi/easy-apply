@@ -3,6 +3,7 @@ import { resolveModelKey } from "@/lib/credentials";
 import { parseDraftInput, parseLetterId, parseRevision, type DraftOutput, type DraftRevision } from "@/lib/draft";
 import { allowWrite } from "@/lib/guard";
 import { privateJson, readJson } from "@/lib/http";
+import { recordKeywordHits } from "@/lib/keywords";
 import { saveLetter } from "@/lib/letters";
 import { ModelError, fallbackNotice, writeWithModel } from "@/lib/models";
 import { UnauthenticatedError, requireUser } from "@/lib/session";
@@ -64,6 +65,14 @@ export async function POST(request: Request) {
   }
 
   const saved = await saveLetter(session, letterId.id, parsed.value, draft);
+  if (!(saved instanceof Response)) {
+    await recordKeywordHits(session, [
+      parsed.value.resume,
+      parsed.value.jobDescription,
+      draft.letter,
+      draft.email,
+    ]);
+  }
   if (saved instanceof Response) {
     const failure = (await saved.json()) as { error?: string };
     return privateJson({
