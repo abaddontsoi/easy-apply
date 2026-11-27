@@ -69,7 +69,7 @@ export function KeywordArea({
   onKeyUp,
   onScroll,
   ...props
-}: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+}: Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value"> & { value: string }) {
   const book = useContext(KeywordContext);
   const mirror = useRef<HTMLDivElement>(null);
   const [popup, setPopup] = useState<Popup | null>(null);
