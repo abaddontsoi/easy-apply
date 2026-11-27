@@ -43,6 +43,9 @@ export function AppShell({
           <ShellLink href="/" current={pathname === "/"}>
             寫作新信件
           </ShellLink>
+          <ShellLink href="/stats" current={pathname === "/stats"}>
+            統計
+          </ShellLink>
           <ShellLink href="/settings" current={pathname === "/settings"}>
             設定
           </ShellLink>

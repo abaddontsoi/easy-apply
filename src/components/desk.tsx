@@ -1,6 +1,7 @@
 "use client";
 
 import { AppShell } from "@/components/app-shell";
+import { KeywordArea, KeywordBook, KeywordText } from "@/components/keyword-book";
 import { clearSelectedJob, peekSelectedJob } from "@/lib/selected-job";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -351,6 +352,7 @@ export function Desk({
   const activeText = activePane === "email" ? emailWithSubject(subject, emailBody, language) : letter;
 
   return (
+    <KeywordBook>
     <AppShell
       email={email}
       note={keyWarning}
@@ -405,7 +407,10 @@ export function Desk({
                   </Link>
                 </div>
                 {resume ? (
-                  <p className="line-clamp-6 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{resume}</p>
+                  <KeywordText
+                    text={resume}
+                    className="line-clamp-6 text-sm leading-6 whitespace-pre-wrap text-muted-foreground"
+                  />
                 ) : (
                   <p className="text-sm leading-6 text-muted-foreground">
                     尚未儲存履歷。到設定頁貼上或上傳，撰寫時會使用那一份。
@@ -429,7 +434,7 @@ export function Desk({
                     </Button>
                   </span>
                 </div>
-                <Textarea
+                <KeywordArea
                   id="job"
                   value={jobDescription}
                   maxLength={20000}
@@ -589,6 +594,7 @@ export function Desk({
         </section>
       </main>
     </AppShell>
+    </KeywordBook>
   );
 }
 

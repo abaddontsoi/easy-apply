@@ -78,6 +78,7 @@ export type Desk = {
   rows: MemoryLetter[];
   secrets: MemoryLetter[];
   resumes: MemoryLetter[];
+  keywords: MemoryLetter[];
   signInAs: (userId: string | null) => void;
 };
 
@@ -85,6 +86,7 @@ export function installDesk(users: { id: string; email: string; password?: strin
   const rows: MemoryLetter[] = [];
   const secrets: MemoryLetter[] = [];
   const resumes: MemoryLetter[] = [];
+  const keywords: MemoryLetter[] = [];
   const accounts = new Map<string, Account>();
   for (const user of users) {
     accounts.set(user.email, { id: user.id, email: user.email, password: user.password ?? "password-ok" });
@@ -99,12 +101,14 @@ export function installDesk(users: { id: string; email: string; password?: strin
           current = next;
         },
       ),
-    createDataClient: () => createMemoryDataClient(rows, { secrets, resumes }) as unknown as SupabaseClient,
+    createDataClient: () =>
+      createMemoryDataClient(rows, { secrets, resumes, keywords }) as unknown as SupabaseClient,
   });
   return {
     rows,
     secrets,
     resumes,
+    keywords,
     signInAs(userId: string | null) {
       current = [...accounts.values()].find((account) => account.id === userId) ?? null;
     },
